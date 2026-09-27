@@ -1,0 +1,253 @@
+#include "HabitLibraryActivity.h"
+
+#include <GfxRenderer.h>
+#include <esp_random.h>
+
+#include <cstdio>
+#include <utility>
+
+#include "activities/util/KeyboardEntryActivity.h"
+#include "components/UITheme.h"
+
+namespace fui = freeink::ui;
+
+HabitLibraryActivity::HabitLibraryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+    : UiListActivity("HabitLibrary", renderer, mappedInput) {}
+
+void HabitLibraryActivity::onEnter() {
+  UiListActivity::onEnter();
+  rebuildRows();
+}
+
+void HabitLibraryActivity::rebuildRows() {
+  labels.clear();
+  subtitles.clear();
+  rows.clear();
+
+  const auto& habits = HABIT_SHEEP.getHabits();
+  labels.reserve(habits.size() + 1);
+  subtitles.reserve(habits.size() + 1);
+  rows.reserve(habits.size() + 1);
+
+  for (const auto& habit : habits) {
+    labels.push_back(habit.name);
+    if (habit.type == HabitType::Completion) {
+      subtitles.emplace_back("Completion");
+    } else {
+      std::string text = std::to_string(habit.targetMinutes) + " min";
+      if (habit.readingIntegration) text += " · Reading";
+      subtitles.push_back(std::move(text));
+    }
+  }
+  if (habits.size() < HabitSheepStore::MAX_HABITS) {
+    labels.emplace_back("+ Add habit");
+    subtitles.emplace_back("");
+  }
+
+  for (size_t i = 0; i < labels.size(); ++i) {
+    fui::ListItem item;
+    item.label = labels[i].c_str();
+    item.subtitle = subtitles[i].empty() ? nullptr : subtitles[i].c_str();
+    item.actionValue = static_cast<int16_t>(i);
+    rows.push_back(item);
+  }
+  if (!rows.empty()) nav.selected = std::min(nav.selected, static_cast<int>(rows.size()) - 1);
+}
+
+void HabitLibraryActivity::startAddHabit() {
+  auto handler = [this](const ActivityResult& result) {
+    if (result.isCancelled) return;
+    const auto& kb = std::get<KeyboardResult>(result.data);
+    if (kb.text.empty()) return;
+    pendingName = kb.text;
+    chooseNewHabitType();
+  };
+  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Habit name", "", 64,
+                                                                 InputType::Text),
+                         handler);
+}
+
+void HabitLibraryActivity::chooseNewHabitType() {
+  static const char* OPTIONS[] = {"Completion", "Duration"};
+  popup.show("Habit type", OPTIONS, 2, 0, [this](const int index) {
+    pendingType = index == 1 ? HabitType::Duration : HabitType::Completion;
+    if (pendingType == HabitType::Duration)
+      chooseDurationTarget();
+    else
+      savePendingHabit(false);
+  });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::chooseDurationTarget() {
+  static const char* OPTIONS[] = {"10 minutes", "15 minutes", "20 minutes", "30 minutes",
+                                  "45 minutes", "60 minutes", "90 minutes"};
+  popup.show("Daily target", OPTIONS, 7, 3, [this](const int index) {
+    static constexpr uint16_t TARGETS[] = {10, 15, 20, 30, 45, 60, 90};
+    if (index < 0 || index >= 7) return;
+    pendingTargetMinutes = TARGETS[index];
+    chooseReadingIntegration();
+  });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::chooseReadingIntegration() {
+  static const char* OPTIONS[] = {"Normal duration habit", "Reading integration"};
+  popup.show("Integration", OPTIONS, 2, 0, [this](const int index) { savePendingHabit(index == 1); });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::savePendingHabit(const bool readingIntegration) {
+  char id[32];
+  snprintf(id, sizeof(id), "h-%08lX-%08lX", static_cast<unsigned long>(esp_random()),
+           static_cast<unsigned long>(esp_random()));
+
+  HabitDefinition habit;
+  habit.id = id;
+  habit.name = pendingName;
+  habit.type = pendingType;
+  habit.targetMinutes = pendingType == HabitType::Duration ? pendingTargetMinutes : 0;
+  habit.readingIntegration = pendingType == HabitType::Duration && readingIntegration;
+
+  if (HABIT_SHEEP.upsertHabit(habit)) {
+    // Fill the first empty active slot. Users can immediately use the habit,
+    // while still retaining explicit 3-slot control in Active Habits.
+    auto active = HABIT_SHEEP.getActiveHabitIds();
+    for (int i = 0; i < static_cast<int>(active.size()); ++i) {
+      if (active[i].empty()) {
+        HABIT_SHEEP.setActiveHabit(i, habit.id);
+        break;
+      }
+    }
+  }
+  pendingName.clear();
+  rebuildRows();
+  requestUpdate();
+}
+
+void HabitLibraryActivity::renameHabit(const std::string& habitId) {
+  const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
+  if (!found) return;
+  const HabitDefinition original = *found;
+  auto handler = [this, original](const ActivityResult& result) mutable {
+    if (result.isCancelled) return;
+    const auto& kb = std::get<KeyboardResult>(result.data);
+    if (kb.text.empty()) return;
+    original.name = kb.text;
+    HABIT_SHEEP.upsertHabit(original);
+    rebuildRows();
+    requestUpdate();
+  };
+  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Rename habit", original.name,
+                                                                 64, InputType::Text),
+                         handler);
+}
+
+void HabitLibraryActivity::changeTarget(const std::string& habitId) {
+  const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
+  if (!found || found->type != HabitType::Duration) return;
+  const HabitDefinition original = *found;
+  static const char* OPTIONS[] = {"10 minutes", "15 minutes", "20 minutes", "30 minutes",
+                                  "45 minutes", "60 minutes", "90 minutes"};
+  popup.show("Daily target", OPTIONS, 7, 3, [this, original](const int index) mutable {
+    static constexpr uint16_t TARGETS[] = {10, 15, 20, 30, 45, 60, 90};
+    if (index < 0 || index >= 7) return;
+    original.targetMinutes = TARGETS[index];
+    HABIT_SHEEP.upsertHabit(original);
+    rebuildRows();
+    requestUpdate();
+  });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::toggleReadingIntegration(const std::string& habitId) {
+  const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
+  if (!found || found->type != HabitType::Duration) return;
+  HabitDefinition updated = *found;
+  updated.readingIntegration = !updated.readingIntegration;
+  HABIT_SHEEP.upsertHabit(updated);
+  rebuildRows();
+  requestUpdate();
+}
+
+void HabitLibraryActivity::confirmDelete(const std::string& habitId) {
+  static const char* OPTIONS[] = {"Cancel", "Delete"};
+  popup.show("Delete habit?", OPTIONS, 2, 0, [this, habitId](const int index) {
+    if (index == 1) HABIT_SHEEP.removeHabit(habitId);
+    rebuildRows();
+    requestUpdate();
+  });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
+  const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
+  if (!habit) return;
+
+  if (habit->type == HabitType::Duration) {
+    static const char* OPTIONS[] = {"Rename", "Change target", "Toggle reading integration", "Delete"};
+    popup.show(habit->name.c_str(), OPTIONS, 4, 0, [this, habitId](const int index) {
+      if (index == 0)
+        renameHabit(habitId);
+      else if (index == 1)
+        changeTarget(habitId);
+      else if (index == 2)
+        toggleReadingIntegration(habitId);
+      else if (index == 3)
+        confirmDelete(habitId);
+    });
+  } else {
+    static const char* OPTIONS[] = {"Rename", "Delete"};
+    popup.show(habit->name.c_str(), OPTIONS, 2, 0, [this, habitId](const int index) {
+      if (index == 0)
+        renameHabit(habitId);
+      else if (index == 1)
+        confirmDelete(habitId);
+    });
+  }
+  requestUpdate();
+}
+
+void HabitLibraryActivity::activateIndex(const int index) {
+  nav.selected = index;
+  app.clearTapFlash();
+  const auto& habits = HABIT_SHEEP.getHabits();
+  if (index >= 0 && index < static_cast<int>(habits.size())) {
+    showEditMenu(habits[index].id);
+  } else if (habits.size() < HabitSheepStore::MAX_HABITS && index == static_cast<int>(habits.size())) {
+    startAddHabit();
+  }
+}
+
+bool HabitLibraryActivity::handleCustomInput() {
+  return popup.handleInput(mappedInput, [this] { requestUpdate(); });
+}
+
+void HabitLibraryActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  screen.setContentMarginFromScreen(
+      fui::Insets{static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
+                  static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
+                  static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height) + metrics.buttonHintsHeight),
+                  static_cast<int16_t>(safe.x)});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+
+  if (rows.empty()) {
+    screen.centeredText("Habit library is full", screen.theme().bodyText);
+    return;
+  }
+
+  fui::ListProps props;
+  props.items = rows.data();
+  props.count = static_cast<uint16_t>(rows.size());
+  props.action = ACTION_ROW;
+  props.inputMask = fui::InputTouch;
+  syncListViewport(screen, props);
+  screen.list(props);
+}
+
+void HabitLibraryActivity::render(RenderLock&& lock) {
+  if (popup.processRender(renderer, mappedInput)) return;
+  UiListActivity::render(std::move(lock));
+}

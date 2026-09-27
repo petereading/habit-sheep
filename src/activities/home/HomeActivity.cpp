@@ -22,6 +22,7 @@
 #include "HabitEventLog.h"
 #include "HabitTimer.h"
 #include "activities/habits/HabitDurationActivity.h"
+#include "activities/habits/HabitSheepSettingsActivity.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -373,7 +374,11 @@ void HomeActivity::activateHabitSheepSelection() {
     case HabitSheepHomeUi::Action::Habit3: {
       const int slot = static_cast<int>(action) - static_cast<int>(HabitSheepHomeUi::Action::Habit1);
       const auto& active = HABIT_SHEEP.getActiveHabitIds();
-      if (slot < 0 || slot >= static_cast<int>(active.size()) || active[slot].empty()) break;
+      if (slot < 0 || slot >= static_cast<int>(active.size())) break;
+      if (active[slot].empty()) {
+        showHabitReplacementPicker(slot);
+        break;
+      }
       const HabitDefinition* habit = HABIT_SHEEP.findHabit(active[slot]);
       if (!habit) break;
 
@@ -407,9 +412,11 @@ void HomeActivity::activateHabitSheepSelection() {
     case HabitSheepHomeUi::Action::Transfer:
       onFileTransferOpen();
       break;
-    case HabitSheepHomeUi::Action::Settings:
-      onSettingsOpen();
+    case HabitSheepHomeUi::Action::Settings: {
+      auto settings = makeUniqueNoThrow<HabitSheepSettingsActivity>(renderer, mappedInput);
+      if (settings) activityManager.pushActivity(std::move(settings));
       break;
+    }
     case HabitSheepHomeUi::Action::None:
       break;
   }
