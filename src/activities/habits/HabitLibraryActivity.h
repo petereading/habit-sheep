@@ -21,7 +21,6 @@ class HabitLibraryActivity final : public UiListActivity {
   OptionPopup popup;
 
   std::string pendingName;
-  std::string editingHabitId;
   HabitType pendingType = HabitType::Completion;
   uint16_t pendingTargetMinutes = 0;
 
