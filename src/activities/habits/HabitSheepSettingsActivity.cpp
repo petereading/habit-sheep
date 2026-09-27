@@ -17,7 +17,8 @@ HabitSheepSettingsActivity::HabitSheepSettingsActivity(GfxRenderer& renderer, Ma
   rows[0].label = "Sheep name";
   rows[1].label = "Active habits";
   rows[2].label = "Habit library";
-  rows[3].label = "CrossPoint settings";
+  rows[3].label = "Sleep sheep scene";
+  rows[4].label = "CrossPoint settings";
   for (int i = 0; i < ROW_COUNT; ++i) rows[i].actionValue = static_cast<int16_t>(i);
 }
 
@@ -35,7 +36,8 @@ void HabitSheepSettingsActivity::refreshRows() {
   }
   values[1] = std::to_string(activeCount) + " / 3 selected";
   values[2] = std::to_string(HABIT_SHEEP.getHabits().size()) + " / 9 saved";
-  values[3] = "Reader, display, network & system";
+  values[3] = HABIT_SHEEP.isSleepSceneEnabled() ? "On" : "Off";
+  values[4] = "Reader, display, network & system";
 
   for (int i = 0; i < ROW_COUNT; ++i) rows[i].subtitle = values[i].c_str();
 }
@@ -62,6 +64,10 @@ void HabitSheepSettingsActivity::activateIndex(const int index) {
   } else if (index == 2) {
     activityManager.pushActivity(std::make_unique<HabitLibraryActivity>(renderer, mappedInput));
   } else if (index == 3) {
+    HABIT_SHEEP.setSleepSceneEnabled(!HABIT_SHEEP.isSleepSceneEnabled());
+    refreshRows();
+    requestUpdate();
+  } else if (index == 4) {
     activityManager.goToSettings();
   }
 }
