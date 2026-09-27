@@ -527,8 +527,9 @@ void SleepActivity::onEnter() {
   display.setInverted(false);
 
   // Habit Sheep owns the normal sleep scene in this fork. Quick Resume above
-  // remains an explicit user override.
-  return renderHabitSheepSleepScreen();
+  // remains an explicit user override. Users can disable this in Habit Sheep
+  // settings to fall back to the upstream CrossPoint sleep-screen modes.
+  if (HABIT_SHEEP.isSleepSceneEnabled()) return renderHabitSheepSleepScreen();
 
   if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM) {
     // Transparent mode retains the current framebuffer. Materialize any
