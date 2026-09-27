@@ -10,12 +10,16 @@
 #include <WiFi.h>
 #include <esp_efuse.h>
 #include <esp_efuse_table.h>
+#include <esp_random.h>
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstring>
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
+#include "HabitSheepStore.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
@@ -176,6 +180,8 @@ void CrossPointWebServer::begin() {
   server->on("/settings", HTTP_GET, [this] { handleSettingsPage(); });
   server->on("/api/settings", HTTP_GET, [this] { handleGetSettings(); });
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
+  server->on("/api/habit-sheep", HTTP_GET, [this] { handleGetHabitSheep(); });
+  server->on("/api/habit-sheep", HTTP_POST, [this] { handlePostHabitSheep(); });
 
   // Font management endpoints
   server->on("/fonts", HTTP_GET, [this] { handleFontsPage(); });
@@ -1336,6 +1342,70 @@ void CrossPointWebServer::handlePostSettings() {
 
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
   server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
+}
+
+void CrossPointWebServer::handleGetHabitSheep() const {
+  JsonDocument doc;
+  HABIT_SHEEP.toJson(doc);
+  String output;
+  serializeJson(doc, output);
+  server->send(200, "application/json", output);
+}
+
+void CrossPointWebServer::handlePostHabitSheep() {
+  if (!server->hasArg("plain") || server->arg("plain").length() > 1024) {
+    server->send(400, "text/plain", "Invalid JSON body");
+    return;
+  }
+  JsonDocument doc;
+  if (deserializeJson(doc, server->arg("plain"))) {
+    server->send(400, "text/plain", "Invalid JSON body");
+    return;
+  }
+
+  const char* action = doc["action"] | "";
+  bool valid = false;
+  if (strcmp(action, "saveHabit") == 0) {
+    const char* name = doc["name"] | "";
+    const char* type = doc["type"] | "";
+    const int minutes = doc["targetMinutes"] | 0;
+    const bool duration = strcmp(type, "duration") == 0;
+    const bool completion = strcmp(type, "completion") == 0;
+    const char* requestedId = doc["id"] | "";
+    if (*name && strlen(name) <= HabitSheepStore::MAX_NAME_BYTES && (duration || completion) &&
+        (!duration || (minutes > 0 && minutes <= 1440)) && (!*requestedId || HABIT_SHEEP.findHabit(requestedId))) {
+      char newId[32];
+      const char* id = requestedId;
+      if (!*id) {
+        snprintf(newId, sizeof(newId), "h-%08lX-%08lX", static_cast<unsigned long>(esp_random()),
+                 static_cast<unsigned long>(esp_random()));
+        id = newId;
+      }
+      HabitDefinition habit;
+      habit.id = id;
+      habit.name = name;
+      habit.type = duration ? HabitType::Duration : HabitType::Completion;
+      habit.targetMinutes = duration ? static_cast<uint16_t>(minutes) : 0;
+      habit.readingIntegration = duration && (doc["readingIntegration"] | false);
+      valid = HABIT_SHEEP.upsertHabit(habit);
+    }
+  } else if (strcmp(action, "deleteHabit") == 0) {
+    const char* id = doc["id"] | "";
+    if (*id) valid = HABIT_SHEEP.removeHabit(id);
+  } else if (strcmp(action, "setActive") == 0) {
+    const int slot = doc["slot"] | -1;
+    const char* id = doc["id"] | "";
+    if (slot >= 0 && slot < static_cast<int>(HabitSheepStore::MAX_ACTIVE_HABITS)) {
+      valid = HABIT_SHEEP.setActiveHabit(static_cast<size_t>(slot), id);
+    }
+  } else if (strcmp(action, "setSheepName") == 0) {
+    const char* name = doc["name"] | "";
+    if (strlen(name) <= HabitSheepStore::MAX_NAME_BYTES) valid = HABIT_SHEEP.setSheepName(name);
+  } else if (strcmp(action, "setSleepScene") == 0 && doc["enabled"].is<bool>()) {
+    valid = HABIT_SHEEP.setSleepSceneEnabled(doc["enabled"].as<bool>());
+  }
+
+  server->send(valid ? 200 : 400, "text/plain", valid ? "Saved" : "Invalid habit setting or save failed");
 }
 
 // ---- OPDS Server API ----

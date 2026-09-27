@@ -31,7 +31,7 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   std::array<std::string, MAX_ACTIVE_HABITS> activeHabitIds{};
   bool sleepSceneEnabled = true;
 
-  HabitSheepStore() = default;
+  HabitSheepStore();
   ~HabitSheepStore() = default;
 
   friend class PersistableStore<HabitSheepStore>;
@@ -39,6 +39,7 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   static bool validId(const std::string& id);
   static bool validName(const std::string& name);
   bool isActiveElsewhere(size_t slot, const std::string& habitId) const;
+  void seedDefaultHabits();
 
  public:
   static const char* getFilePath() { return "/.crosspoint/habit_sheep.json"; }

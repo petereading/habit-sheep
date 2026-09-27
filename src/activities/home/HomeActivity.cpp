@@ -27,7 +27,6 @@
 #include "RecentBooksStore.h"
 #include "SheepStateStore.h"
 #include "activities/habits/HabitDurationActivity.h"
-#include "activities/habits/HabitSheepSettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -346,6 +345,7 @@ void HomeActivity::showHabitReplacementPicker(const int slot) {
                              [this, slot](const int selected) {
                                if (selected < 0 || selected >= static_cast<int>(habitReplacementIds.size())) return;
                                HABIT_SHEEP.setActiveHabit(slot, habitReplacementIds[selected]);
+                               if (habitReplacementIds[selected].empty()) selectorIndex = 0;
                                requestUpdate();
                              });
   requestUpdate();
@@ -405,8 +405,7 @@ void HomeActivity::activateHabitSheepSelection() {
       onFileTransferOpen();
       break;
     case HabitSheepHomeUi::Action::Settings: {
-      auto settings = makeUniqueNoThrow<HabitSheepSettingsActivity>(renderer, mappedInput);
-      if (settings) activityManager.pushActivity(std::move(settings));
+      activityManager.goToSettings(4);
       break;
     }
     case HabitSheepHomeUi::Action::None:
@@ -428,12 +427,14 @@ void HomeActivity::loopHabitSheepHome() {
     return;
   }
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Up) ||
+      mappedInput.wasReleased(MappedInputManager::Button::Left)) {
     selectorIndex = habitSheepUi->previousSelection(selectorIndex);
     requestUpdate();
     return;
   }
-  if (mappedInput.wasReleased(MappedInputManager::Button::Down)) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Down) ||
+      mappedInput.wasReleased(MappedInputManager::Button::Right)) {
     selectorIndex = habitSheepUi->nextSelection(selectorIndex);
     requestUpdate();
     return;
@@ -618,7 +619,7 @@ void HomeActivity::render(RenderLock&&) {
   if (habitSheepUi) {
     renderer.clearScreen();
     habitSheepUi->setSelection(selectorIndex);
-    habitSheepUi->renderUi(HABIT_SHEEP);
+    habitSheepUi->renderUi(HABIT_SHEEP, !habitReplacementPopup.isActive());
     if (habitReplacementPopup.processRender(renderer, mappedInput)) return;
     renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH
                                                                    : HalDisplay::FAST_REFRESH);

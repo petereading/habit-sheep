@@ -32,7 +32,7 @@ class HabitSheepHomeUi {
   static Action actionForSelection(int value);
   int selectedAction(MappedInputManager& input) const;
   int longPressedHabit(MappedInputManager& input) const;
-  void renderUi(const HabitSheepStore& store) const;
+  void renderUi(const HabitSheepStore& store, bool showDock = true) const;
   void renderSleepUi(const HabitSheepStore& store) const;
 
   void nudgeSheep() { sheepNudge = static_cast<uint8_t>((sheepNudge + 1) % 3); }

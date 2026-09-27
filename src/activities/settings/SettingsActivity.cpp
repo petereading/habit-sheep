@@ -19,6 +19,7 @@
 #include "ClockSettingsActivity.h"
 #include "CrossPointSettings.h"
 #include "FontDownloadActivity.h"
+#include "HabitSheepStore.h"
 #include "HomeButtonSettingsActivity.h"
 #include "KOReaderSettingsActivity.h"
 #include "KeyboardLayoutsActivity.h"
@@ -32,8 +33,11 @@
 #include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
+#include "activities/habits/ActiveHabitsActivity.h"
+#include "activities/habits/HabitLibraryActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
@@ -41,14 +45,16 @@
 
 namespace fui = freeink::ui;
 
-SettingsActivity::SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : UiTabListActivity("Settings", renderer, mappedInput) {}
+SettingsActivity::SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const int initialCategory)
+    : UiTabListActivity("Settings", renderer, mappedInput),
+      initialCategoryIndex(std::clamp(initialCategory, 0, categoryCount - 1)) {}
 
 void SettingsActivity::rebuildSettingsLists() {
   displaySettings.clear();
   readerSettings.clear();
   controlsSettings.clear();
   systemSettings.clear();
+  habitSheepSettings.clear();
 
   // Pick up any fonts uploaded/deleted over the web server since the last
   // reader activity ran — otherwise the font-family picker shows stale list.
@@ -116,6 +122,11 @@ void SettingsActivity::rebuildSettingsLists() {
   readerSettings.insert(readerSettings.begin() + 1,
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+  habitSheepSettings.reserve(4);
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SLEEP_SHEEP_SCENE, SettingAction::SleepSheepScene));
 
   // Update currentSettings pointer and count for the active category
   switch (selectedCategoryIndex) {
@@ -131,6 +142,9 @@ void SettingsActivity::rebuildSettingsLists() {
     case 3:
       currentSettings = &systemSettings;
       break;
+    case 4:
+      currentSettings = &habitSheepSettings;
+      break;
   }
   settingsCount = static_cast<int>(currentSettings->size());
   rebuildRowItems();
@@ -141,7 +155,7 @@ void SettingsActivity::onEnter() {
 
   // Reset selection to first category (ring position 0, the tab bar, comes
   // from the base's per-tab nav reset)
-  selectedCategoryIndex = 0;
+  selectedCategoryIndex = initialCategoryIndex;
   preserveQuickResumeTimeoutOn =
       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
   quickResumeTimeoutAutoEnabled = false;
@@ -164,6 +178,9 @@ void SettingsActivity::selectCategory(const int categoryIndex) {
       break;
     case 3:
       currentSettings = &systemSettings;
+      break;
+    case 4:
+      currentSettings = &habitSheepSettings;
       break;
   }
   settingsCount = static_cast<int>(currentSettings->size());
@@ -343,6 +360,42 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
+      case SettingAction::SheepName: {
+        auto activity = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SHEEP_NAME),
+                                                                 HABIT_SHEEP.getSheepName(),
+                                                                 HabitSheepStore::MAX_NAME_BYTES, InputType::Text);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Sheep name editor");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult& result) {
+          if (!result.isCancelled) HABIT_SHEEP.setSheepName(std::get<KeyboardResult>(result.data).text);
+          requestUpdate();
+        });
+        break;
+      }
+      case SettingAction::ActiveHabits: {
+        auto activity = makeUniqueNoThrow<ActiveHabitsActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Active habits");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
+      case SettingAction::HabitLibrary: {
+        auto activity = makeUniqueNoThrow<HabitLibraryActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Habit library");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
+      case SettingAction::SleepSheepScene:
+        HABIT_SHEEP.setSleepSceneEnabled(!HABIT_SHEEP.isSleepSceneEnabled());
+        requestUpdate();
+        break;
       case SettingAction::HomeButton: {
         // Activities must outlive this call and are owned by the activity stack.
         auto activity = makeUniqueNoThrow<HomeButtonSettingsActivity>(renderer, mappedInput);
@@ -497,6 +550,16 @@ void SettingsActivity::openSleepTimeoutPicker() {
 }
 
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
+  if (setting.action == SettingAction::SheepName) return HABIT_SHEEP.getSheepName();
+  if (setting.action == SettingAction::ActiveHabits) {
+    const auto& active = HABIT_SHEEP.getActiveHabitIds();
+    return std::to_string(
+               std::count_if(active.begin(), active.end(), [](const std::string& id) { return !id.empty(); })) +
+           "/3";
+  }
+  if (setting.action == SettingAction::HabitLibrary) return std::to_string(HABIT_SHEEP.getHabits().size()) + "/9";
+  if (setting.action == SettingAction::SleepSheepScene)
+    return HABIT_SHEEP.isSleepSceneEnabled() ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
   if (setting.action == SettingAction::HomeButton) return tr(STR_CONFIGURE);
   if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
     return SETTINGS.*(setting.valuePtr) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);

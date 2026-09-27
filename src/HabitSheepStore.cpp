@@ -8,7 +8,7 @@
 #include <utility>
 
 namespace {
-constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 1;
+constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 2;
 
 const char* habitTypeName(const HabitType type) { return type == HabitType::Duration ? "duration" : "completion"; }
 
@@ -16,6 +16,16 @@ HabitType parseHabitType(const char* value) {
   return value && std::string_view(value) == "duration" ? HabitType::Duration : HabitType::Completion;
 }
 }  // namespace
+
+HabitSheepStore::HabitSheepStore() { seedDefaultHabits(); }
+
+void HabitSheepStore::seedDefaultHabits() {
+  habits.reserve(2);
+  habits.push_back({"reading", "Reading", HabitType::Duration, 30, true});
+  habits.push_back({"pomodoro", "Pomodoro", HabitType::Duration, 25, false});
+  activeHabitIds[0] = "reading";
+  activeHabitIds[1] = "pomodoro";
+}
 
 bool HabitSheepStore::validId(const std::string& id) { return !id.empty() && id.size() <= MAX_ID_BYTES; }
 
@@ -86,6 +96,13 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
     if (!id || *id == '\0') continue;
     const std::string candidate(id);
     if (findHabit(candidate) && !isActiveElsewhere(slot, candidate)) activeHabitIds[slot] = candidate;
+  }
+
+  // Upgrade the original empty first-run configuration once. Schema 2 keeps
+  // an intentionally emptied library empty on subsequent loads.
+  if ((doc["schema"] | static_cast<uint8_t>(1)) < HABIT_SHEEP_SCHEMA_VERSION && habits.empty()) {
+    seedDefaultHabits();
+    requestResave();
   }
 
   LOG_DBG("HABIT", "Habit Sheep loaded (%u habits)", static_cast<unsigned>(habits.size()));

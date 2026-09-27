@@ -53,9 +53,21 @@ const uint8_t* dockIcon(const int index) {
 
 void HabitSheepHomeUi::setSelection(const int value) { selection = std::clamp(value, 0, SELECTION_COUNT - 1); }
 
-int HabitSheepHomeUi::nextSelection(const int value) { return (value + 1 + SELECTION_COUNT) % SELECTION_COUNT; }
+int HabitSheepHomeUi::nextSelection(const int value) {
+  int next = value;
+  do {
+    next = (next + 1 + SELECTION_COUNT) % SELECTION_COUNT;
+  } while (next >= 1 && next <= 3 && HABIT_SHEEP.getActiveHabitIds()[next - 1].empty());
+  return next;
+}
 
-int HabitSheepHomeUi::previousSelection(const int value) { return (value - 1 + SELECTION_COUNT) % SELECTION_COUNT; }
+int HabitSheepHomeUi::previousSelection(const int value) {
+  int previous = value;
+  do {
+    previous = (previous - 1 + SELECTION_COUNT) % SELECTION_COUNT;
+  } while (previous >= 1 && previous <= 3 && HABIT_SHEEP.getActiveHabitIds()[previous - 1].empty());
+  return previous;
+}
 
 HabitSheepHomeUi::Action HabitSheepHomeUi::actionForSelection(const int value) {
   if (value < 0 || value >= SELECTION_COUNT) return Action::None;
@@ -73,7 +85,7 @@ int HabitSheepHomeUi::selectedAction(MappedInputManager& input) const {
 
   int row = -1;
   const auto habitTouch = input.rowTouch(row, habitsTop, HABIT_ROW_H, 3, SIDE_PAD, screenW - SIDE_PAD, HABIT_ROW_H);
-  if (habitTouch == MappedInputManager::RowTouch::Tap) return 1 + row;
+  if (habitTouch == MappedInputManager::RowTouch::Tap && !HABIT_SHEEP.getActiveHabitIds()[row].empty()) return 1 + row;
 
   int col = -1;
   const int slotW = screenW / DOCK_COUNT;
@@ -91,11 +103,12 @@ int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
   int y = 0;
   if (input.wasScreenLongPress(x, y) && x >= SIDE_PAD && x < renderer.getScreenWidth() - SIDE_PAD && y >= habitsTop &&
       y < habitsTop + 3 * HABIT_ROW_H) {
-    return (y - habitsTop) / HABIT_ROW_H;
+    const int slot = (y - habitsTop) / HABIT_ROW_H;
+    return HABIT_SHEEP.getActiveHabitIds()[slot].empty() ? -1 : slot;
   }
 
   if (selection >= 1 && selection <= 3 && input.wasLongPressed(MappedInputManager::Button::Confirm, 700)) {
-    return selection - 1;
+    return HABIT_SHEEP.getActiveHabitIds()[selection - 1].empty() ? -1 : selection - 1;
   }
   return -1;
 }
@@ -154,17 +167,14 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
 
   for (int i = 0; i < 3; ++i) {
     const int y = top + i * height;
-    const bool selected = selection == 1 + i;
-    if (selected) renderer.drawRoundedRect(SIDE_PAD, y + 4, screenW - SIDE_PAD * 2, height - 8, 2, 10, true);
-
     const HabitDefinition* habit = active[i].empty() ? nullptr : store.findHabit(active[i]);
-    const char* name = habit ? habit->name.c_str() : "Set habit";
+    if (!habit) continue;
+    if (selection == 1 + i) renderer.drawRoundedRect(SIDE_PAD, y + 4, screenW - SIDE_PAD * 2, height - 8, 2, 10, true);
+    const char* name = habit->name.c_str();
     const auto shown = renderer.truncatedText(NOTOSANS_14_FONT_ID, name, screenW - SIDE_PAD * 2 - 105);
     renderer.drawText(NOTOSANS_14_FONT_ID, SIDE_PAD + 16, y + 18, shown.c_str());
 
-    if (!habit) {
-      renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - 52, y + 22, "+");
-    } else if (habit->type == HabitType::Completion) {
+    if (habit->type == HabitType::Completion) {
       const auto progress = HABIT_EVENTS.progressForToday(habit->id);
       renderer.drawRoundedRect(screenW - SIDE_PAD - 42, y + 15, 22, 22, 2, 4, true);
       if (progress.completed) {
@@ -209,16 +219,18 @@ void HabitSheepHomeUi::drawDock(const int top, const int height) const {
   }
 }
 
-void HabitSheepHomeUi::renderUi(const HabitSheepStore& store) const {
+void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, const bool showDock) const {
   const int screenW = renderer.getScreenWidth();
   const int screenH = renderer.getScreenHeight();
   const int habitsTop = screenH - DOCK_H - 3 * HABIT_ROW_H;
   const int sheepTop = HEADER_H;
   const int sheepHeight = std::max(0, habitsTop - sheepTop);
 
-  const uint16_t rawBattery = powerManager.getBatteryPercentage();
-  const uint16_t bucket = static_cast<uint16_t>(std::min(100, (rawBattery / 10) * 10));
-  GUI.fillBatteryIcon(renderer, Rect{screenW - 42, 16, 24, 18}, bucket);
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto percentageText = std::to_string(powerManager.getBatteryPercentage()) + "%";
+  const int batteryX =
+      screenW - SIDE_PAD - metrics.batteryWidth - 4 - renderer.getTextWidth(SMALL_FONT_ID, percentageText.c_str());
+  GUI.drawBatteryLeft(renderer, Rect{batteryX, 12, metrics.batteryWidth, metrics.batteryHeight}, true);
 
   struct tm local{};
   if (halClock.isAvailable() && halClock.localTime(local)) {
@@ -229,7 +241,7 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store) const {
 
   drawSheep(SIDE_PAD, sheepTop + 4, screenW - SIDE_PAD * 2, sheepHeight - 8, store.getSheepName().c_str());
   drawHabitRows(store, habitsTop, HABIT_ROW_H);
-  drawDock(screenH - DOCK_H, DOCK_H);
+  if (showDock) drawDock(screenH - DOCK_H, DOCK_H);
 }
 
 void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
@@ -244,9 +256,10 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
     renderer.drawText(UI_12_FONT_ID, SIDE_PAD, 22, dateText);
   }
 
-  const uint16_t rawBattery = powerManager.getBatteryPercentage();
-  const uint16_t bucket = static_cast<uint16_t>(std::min(100, ((rawBattery + 5) / 10) * 10));
-  GUI.fillBatteryIcon(renderer, Rect{screenW - 42, 18, 24, 18}, bucket);
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  GUI.drawBatteryLeft(renderer,
+                      Rect{screenW - SIDE_PAD - metrics.batteryWidth, 12, metrics.batteryWidth, metrics.batteryHeight},
+                      false);
 
   const int habitBandH = 150;
   const int sheepTop = 64;
