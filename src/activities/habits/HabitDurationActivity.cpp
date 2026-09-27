@@ -56,9 +56,9 @@ std::vector<std::string> HabitDurationActivity::actionLabels() const {
 void HabitDurationActivity::showAddMinutes() {
   static const char* OPTIONS[] = {"+5 minutes", "+10 minutes", "+15 minutes", "+20 minutes",
                                   "+30 minutes", "+45 minutes", "+60 minutes"};
-  addMinutesPopup.show("Add time", OPTIONS, static_cast<int>(std::size(OPTIONS)), 2, [this](const int selected) {
+  addMinutesPopup.show("Add time", OPTIONS, 7, 2, [this](const int selected) {
     static constexpr uint16_t MINUTES[] = {5, 10, 15, 20, 30, 45, 60};
-    if (selected < 0 || selected >= static_cast<int>(std::size(MINUTES))) return;
+    if (selected < 0 || selected >= 7) return;
     HABIT_EVENTS.appendDurationSeconds(habitId, static_cast<uint32_t>(MINUTES[selected]) * 60,
                                        HabitEventSource::Manual);
     requestUpdate();
