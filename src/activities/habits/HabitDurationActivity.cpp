@@ -20,7 +20,7 @@ namespace {
 constexpr int SIDE_PAD = 24;
 constexpr int CONTENT_TOP = 150;
 constexpr int ROW_H = 58;
-}
+}  // namespace
 
 HabitDurationActivity::HabitDurationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                              std::string habitIdValue)
@@ -54,7 +54,7 @@ std::vector<std::string> HabitDurationActivity::actionLabels() const {
 }
 
 void HabitDurationActivity::showAddMinutes() {
-  static const char* OPTIONS[] = {"+5 minutes", "+10 minutes", "+15 minutes", "+20 minutes",
+  static const char* OPTIONS[] = {"+5 minutes",  "+10 minutes", "+15 minutes", "+20 minutes",
                                   "+30 minutes", "+45 minutes", "+60 minutes"};
   addMinutesPopup.show("Add time", OPTIONS, 7, 2, [this](const int selected) {
     static constexpr uint16_t MINUTES[] = {5, 10, 15, 20, 30, 45, 60};
@@ -68,11 +68,11 @@ void HabitDurationActivity::showAddMinutes() {
 
 void HabitDurationActivity::continueReading() {
   const auto& books = RECENT_BOOKS.getBooks();
-  for (const auto& book : books) {
-    if (!RecentBooksStore::isMissing(book)) {
-      activityManager.goToReader(book.path);
-      return;
-    }
+  const auto book = std::find_if(books.begin(), books.end(),
+                                 [](const RecentBook& item) { return !RecentBooksStore::isMissing(item); });
+  if (book != books.end()) {
+    activityManager.goToReader(book->path);
+    return;
   }
   activityManager.goToFileBrowser("/");
 }
@@ -150,8 +150,8 @@ void HabitDurationActivity::loop() {
   }
 
   int row = -1;
-  const auto touch =
-      mappedInput.rowTouch(row, CONTENT_TOP, ROW_H, labels.size(), SIDE_PAD, renderer.getScreenWidth() - SIDE_PAD, ROW_H);
+  const auto touch = mappedInput.rowTouch(row, CONTENT_TOP, ROW_H, labels.size(), SIDE_PAD,
+                                          renderer.getScreenWidth() - SIDE_PAD, ROW_H);
   if (touch == MappedInputManager::RowTouch::Tap) {
     selection = row;
     activate();
@@ -198,7 +198,8 @@ void HabitDurationActivity::render(RenderLock&&) {
   const int barW = screenW - SIDE_PAD * 2;
   renderer.drawRect(barX, 134, barW, 8, true);
   const uint32_t targetSeconds = static_cast<uint32_t>(habit->targetMinutes) * 60;
-  const int fill = targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
+  const int fill =
+      targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
   if (fill > 0) renderer.fillRect(barX + 2, 136, fill, 4, true);
 
   const auto labels = actionLabels();

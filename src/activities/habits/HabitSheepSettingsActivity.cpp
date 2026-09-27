@@ -3,6 +3,8 @@
 #include <GfxRenderer.h>
 #include <Memory.h>
 
+#include <algorithm>
+
 #include "HabitSheepStore.h"
 #include "activities/ActivityManager.h"
 #include "activities/habits/ActiveHabitsActivity.h"
@@ -30,10 +32,9 @@ void HabitSheepSettingsActivity::onEnter() {
 void HabitSheepSettingsActivity::refreshRows() {
   values[0] = HABIT_SHEEP.getSheepName().empty() ? "Not named" : HABIT_SHEEP.getSheepName();
 
-  int activeCount = 0;
-  for (const auto& id : HABIT_SHEEP.getActiveHabitIds()) {
-    if (!id.empty()) ++activeCount;
-  }
+  const int activeCount =
+      static_cast<int>(std::count_if(HABIT_SHEEP.getActiveHabitIds().begin(), HABIT_SHEEP.getActiveHabitIds().end(),
+                                     [](const std::string& id) { return !id.empty(); }));
   values[1] = std::to_string(activeCount) + " / 3 selected";
   values[2] = std::to_string(HABIT_SHEEP.getHabits().size()) + " / 9 saved";
   values[3] = HABIT_SHEEP.isSleepSceneEnabled() ? "On" : "Off";
@@ -55,10 +56,10 @@ void HabitSheepSettingsActivity::activateIndex(const int index) {
         requestUpdate();
       }
     };
-    startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Name your sheep",
-                                                                   HABIT_SHEEP.getSheepName(),
-                                                                   HabitSheepStore::MAX_NAME_BYTES, InputType::Text),
-                           handler);
+    startActivityForResult(
+        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Name your sheep", HABIT_SHEEP.getSheepName(),
+                                                HabitSheepStore::MAX_NAME_BYTES, InputType::Text),
+        handler);
   } else if (index == 1) {
     activityManager.pushActivity(std::make_unique<ActiveHabitsActivity>(renderer, mappedInput));
   } else if (index == 2) {

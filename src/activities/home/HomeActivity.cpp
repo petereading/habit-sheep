@@ -18,16 +18,16 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "HabitSheepStore.h"
-#include "HabitEventLog.h"
-#include "HabitTimer.h"
-#include "SheepStateStore.h"
-#include "activities/habits/HabitDurationActivity.h"
-#include "activities/habits/HabitSheepSettingsActivity.h"
 #include "CrossPointState.h"
+#include "HabitEventLog.h"
+#include "HabitSheepStore.h"
+#include "HabitTimer.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
+#include "SheepStateStore.h"
+#include "activities/habits/HabitDurationActivity.h"
+#include "activities/habits/HabitSheepSettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -328,35 +328,26 @@ void HomeActivity::showHabitReplacementPicker(const int slot) {
 
   const auto& active = HABIT_SHEEP.getActiveHabitIds();
   for (const auto& habit : HABIT_SHEEP.getHabits()) {
-    bool usedElsewhere = false;
-    for (int i = 0; i < static_cast<int>(active.size()); ++i) {
-      if (i != slot && active[i] == habit.id) {
-        usedElsewhere = true;
-        break;
-      }
-    }
+    const bool usedElsewhere =
+        std::any_of(active.begin(), active.end(), [&](const std::string& id) { return id == habit.id && id != active[slot]; });
     if (usedElsewhere) continue;
     labels.push_back(habit.name);
     habitReplacementIds.push_back(habit.id);
   }
 
-  int current = 0;
-  for (int i = 1; i < static_cast<int>(habitReplacementIds.size()); ++i) {
-    if (habitReplacementIds[i] == active[slot]) {
-      current = i;
-      break;
-    }
-  }
+  const auto currentIt = std::find(habitReplacementIds.begin() + 1, habitReplacementIds.end(), active[slot]);
+  const int current = currentIt == habitReplacementIds.end()
+                          ? 0
+                          : static_cast<int>(std::distance(habitReplacementIds.begin(), currentIt));
 
-  std::vector<const char*> options;
-  options.reserve(labels.size());
-  for (const auto& label : labels) options.push_back(label.c_str());
+  std::vector<const char*> options(labels.size());
+  std::transform(labels.begin(), labels.end(), options.begin(), [](const std::string& label) { return label.c_str(); });
   habitReplacementPopup.show("Active habit", options.data(), static_cast<int>(options.size()), current,
                              [this, slot](const int selected) {
-    if (selected < 0 || selected >= static_cast<int>(habitReplacementIds.size())) return;
-    HABIT_SHEEP.setActiveHabit(slot, habitReplacementIds[selected]);
-    requestUpdate();
-  });
+                               if (selected < 0 || selected >= static_cast<int>(habitReplacementIds.size())) return;
+                               HABIT_SHEEP.setActiveHabit(slot, habitReplacementIds[selected]);
+                               requestUpdate();
+                             });
   requestUpdate();
 }
 

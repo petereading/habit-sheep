@@ -1,18 +1,18 @@
 #include "HabitSheepHomeUi.h"
 
 #include <GfxRenderer.h>
-#include <HalPowerManager.h>
 #include <HalClock.h>
+#include <HalPowerManager.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
 
-#include "HabitSheepStore.h"
 #include "HabitEventLog.h"
+#include "HabitSheepStore.h"
 #include "HabitTimer.h"
-#include "SheepStateStore.h"
 #include "MappedInputManager.h"
+#include "SheepStateStore.h"
 #include "components/icons/blocks.h"
 #include "components/icons/book.h"
 #include "components/icons/folder.h"
@@ -52,13 +52,13 @@ const uint8_t* dockIcon(const int index) {
 
 void HabitSheepHomeUi::setSelection(const int value) { selection = std::clamp(value, 0, SELECTION_COUNT - 1); }
 
-int HabitSheepHomeUi::nextSelection(const int value) const { return (value + 1 + SELECTION_COUNT) % SELECTION_COUNT; }
+int HabitSheepHomeUi::nextSelection(const int value) { return (value + 1 + SELECTION_COUNT) % SELECTION_COUNT; }
 
-int HabitSheepHomeUi::previousSelection(const int value) const {
+int HabitSheepHomeUi::previousSelection(const int value) {
   return (value - 1 + SELECTION_COUNT) % SELECTION_COUNT;
 }
 
-HabitSheepHomeUi::Action HabitSheepHomeUi::actionForSelection(const int value) const {
+HabitSheepHomeUi::Action HabitSheepHomeUi::actionForSelection(const int value) {
   if (value < 0 || value >= SELECTION_COUNT) return Action::None;
   return static_cast<Action>(value + 1);
 }
@@ -90,8 +90,8 @@ int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
 
   int x = 0;
   int y = 0;
-  if (input.wasScreenLongPress(x, y) && x >= SIDE_PAD && x < renderer.getScreenWidth() - SIDE_PAD &&
-      y >= habitsTop && y < habitsTop + 3 * HABIT_ROW_H) {
+  if (input.wasScreenLongPress(x, y) && x >= SIDE_PAD && x < renderer.getScreenWidth() - SIDE_PAD && y >= habitsTop &&
+      y < habitsTop + 3 * HABIT_ROW_H) {
     return (y - habitsTop) / HABIT_ROW_H;
   }
 
@@ -117,7 +117,8 @@ void HabitSheepHomeUi::drawPasture(const int x, const int y, const int width, co
   }
 }
 
-void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, const int height, const char* name, const bool showSelection) const {
+void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, const int height, const char* name,
+                                 const bool showSelection) const {
   if (showSelection && selection == 0) renderer.drawRoundedRect(x, y, width, height, 2, 16, true);
 
   const int cx = x + width / 2;
@@ -187,7 +188,8 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
       const int barW = 86;
       renderer.drawRect(barX, barY, barW, 7, true);
       const uint32_t targetSeconds = static_cast<uint32_t>(habit->targetMinutes) * 60;
-      const int fill = targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
+      const int fill =
+          targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
       if (fill > 0) renderer.fillRect(barX + 2, barY + 2, fill, 3, true);
     }
   }
@@ -219,7 +221,7 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store) const {
   const uint16_t bucket = static_cast<uint16_t>(std::min(100, (rawBattery / 10) * 10));
   GUI.fillBatteryIcon(renderer, Rect{screenW - 42, 16, 24, 18}, bucket);
 
-  struct tm local {};
+  struct tm local{};
   if (halClock.isAvailable() && halClock.localTime(local)) {
     char dateText[24];
     strftime(dateText, sizeof(dateText), "%a %d %b", &local);
@@ -231,13 +233,12 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store) const {
   drawDock(screenH - DOCK_H, DOCK_H);
 }
 
-
 void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
   const int screenW = renderer.getScreenWidth();
   const int screenH = renderer.getScreenHeight();
   renderer.clearScreen();
 
-  struct tm local {};
+  struct tm local{};
   if (halClock.isAvailable() && halClock.localTime(local)) {
     char dateText[32];
     strftime(dateText, sizeof(dateText), "%A %d %b", &local);

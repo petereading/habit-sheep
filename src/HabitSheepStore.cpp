@@ -10,9 +10,7 @@
 namespace {
 constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 1;
 
-const char* habitTypeName(const HabitType type) {
-  return type == HabitType::Duration ? "duration" : "completion";
-}
+const char* habitTypeName(const HabitType type) { return type == HabitType::Duration ? "duration" : "completion"; }
 
 HabitType parseHabitType(const char* value) {
   return value && std::string_view(value) == "duration" ? HabitType::Duration : HabitType::Completion;
@@ -95,7 +93,8 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
 }
 
 const HabitDefinition* HabitSheepStore::findHabit(const std::string& id) const {
-  const auto it = std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& habit) { return habit.id == id; });
+  const auto it =
+      std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& habit) { return habit.id == id; });
   return it == habits.end() ? nullptr : &*it;
 }
 
@@ -143,7 +142,6 @@ bool HabitSheepStore::setActiveHabit(const size_t slot, const std::string& habit
   activeHabitIds[slot] = habitId;
   return saveToFile();
 }
-
 
 bool HabitSheepStore::setSleepSceneEnabled(const bool enabled) {
   sleepSceneEnabled = enabled;

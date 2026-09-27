@@ -52,7 +52,7 @@ void HabitLibraryActivity::rebuildRows() {
     item.actionValue = static_cast<int16_t>(i);
     rows.push_back(item);
   }
-  if (!rows.empty()) nav.selected = std::min(nav.selected, static_cast<int>(rows.size()) - 1);
+  if (!rows.empty()) nav.selected = std::min(nav.selected.load(), static_cast<int>(rows.size()) - 1);
 }
 
 void HabitLibraryActivity::startAddHabit() {
@@ -63,9 +63,8 @@ void HabitLibraryActivity::startAddHabit() {
     pendingName = kb.text;
     chooseNewHabitType();
   };
-  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Habit name", "", 64,
-                                                                 InputType::Text),
-                         handler);
+  startActivityForResult(
+      std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Habit name", "", 64, InputType::Text), handler);
 }
 
 void HabitLibraryActivity::chooseNewHabitType() {
@@ -129,7 +128,7 @@ void HabitLibraryActivity::savePendingHabit(const bool readingIntegration) {
 void HabitLibraryActivity::renameHabit(const std::string& habitId) {
   const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
   if (!found) return;
-  const HabitDefinition original = *found;
+  HabitDefinition original = *found;
   auto handler = [this, original](const ActivityResult& result) mutable {
     if (result.isCancelled) return;
     const auto& kb = std::get<KeyboardResult>(result.data);
@@ -147,7 +146,7 @@ void HabitLibraryActivity::renameHabit(const std::string& habitId) {
 void HabitLibraryActivity::changeTarget(const std::string& habitId) {
   const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
   if (!found || found->type != HabitType::Duration) return;
-  const HabitDefinition original = *found;
+  HabitDefinition original = *found;
   static const char* OPTIONS[] = {"10 minutes", "15 minutes", "20 minutes", "30 minutes",
                                   "45 minutes", "60 minutes", "90 minutes"};
   popup.show("Daily target", OPTIONS, 7, 3, [this, original](const int index) mutable {

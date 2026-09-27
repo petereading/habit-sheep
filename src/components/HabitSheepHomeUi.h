@@ -27,9 +27,9 @@ class HabitSheepHomeUi {
   explicit HabitSheepHomeUi(GfxRenderer& renderer) : renderer(renderer) {}
 
   void setSelection(int value);
-  int nextSelection(int value) const;
-  int previousSelection(int value) const;
-  Action actionForSelection(int value) const;
+  static int nextSelection(int value);
+  static int previousSelection(int value);
+  static Action actionForSelection(int value);
   int selectedAction(MappedInputManager& input) const;
   int longPressedHabit(MappedInputManager& input) const;
   void renderUi(const HabitSheepStore& store) const;

@@ -2,6 +2,8 @@
 
 #include <GfxRenderer.h>
 
+#include <algorithm>
+
 #include <utility>
 
 #include "HabitSheepStore.h"
@@ -39,29 +41,18 @@ void ActiveHabitsActivity::showPicker(const int slot) {
   pickerIds.emplace_back("");
 
   for (const auto& habit : HABIT_SHEEP.getHabits()) {
-    bool usedElsewhere = false;
-    for (int i = 0; i < 3; ++i) {
-      if (i != slot && active[i] == habit.id) {
-        usedElsewhere = true;
-        break;
-      }
-    }
+    const bool usedElsewhere =
+        std::any_of(active.begin(), active.end(), [&](const std::string& id) { return id == habit.id && id != active[slot]; });
     if (usedElsewhere) continue;
     labels.push_back(habit.name);
     pickerIds.push_back(habit.id);
   }
 
-  std::vector<const char*> options;
-  options.reserve(labels.size());
-  for (const auto& label : labels) options.push_back(label.c_str());
+  std::vector<const char*> options(labels.size());
+  std::transform(labels.begin(), labels.end(), options.begin(), [](const std::string& label) { return label.c_str(); });
 
-  int current = 0;
-  for (int i = 1; i < static_cast<int>(pickerIds.size()); ++i) {
-    if (pickerIds[i] == active[slot]) {
-      current = i;
-      break;
-    }
-  }
+  const auto currentIt = std::find(pickerIds.begin() + 1, pickerIds.end(), active[slot]);
+  const int current = currentIt == pickerIds.end() ? 0 : static_cast<int>(std::distance(pickerIds.begin(), currentIt));
 
   picker.show("Choose habit", options.data(), static_cast<int>(options.size()), current, [this, slot](const int index) {
     if (index < 0 || index >= static_cast<int>(pickerIds.size())) return;

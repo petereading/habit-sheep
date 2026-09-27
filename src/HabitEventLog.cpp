@@ -7,12 +7,12 @@
 #include <esp_mac.h>
 #include <esp_random.h>
 
-#include "SheepStateStore.h"
-
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+
+#include "SheepStateStore.h"
 
 namespace {
 constexpr const char* EVENT_DIR = "/.crosspoint/habit_events";
@@ -37,7 +37,7 @@ HabitEventLog& HabitEventLog::getInstance() {
 }
 
 bool HabitEventLog::currentDay(std::string& day, int64_t& epoch) const {
-  struct tm local {};
+  struct tm local{};
   if (!halClock.isAvailable() || !halClock.localTime(local)) {
     day = "undated";
     epoch = 0;
@@ -147,8 +147,8 @@ bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, co
   uint8_t mac[6] = {0};
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   char eventId[48];
-  snprintf(eventId, sizeof(eventId), "%02X%02X%02X%02X%02X%02X-%08lX-%08lX", mac[0], mac[1], mac[2], mac[3],
-           mac[4], mac[5], static_cast<unsigned long>(esp_random()), static_cast<unsigned long>(esp_random()));
+  snprintf(eventId, sizeof(eventId), "%02X%02X%02X%02X%02X%02X-%08lX-%08lX", mac[0], mac[1], mac[2], mac[3], mac[4],
+           mac[5], static_cast<unsigned long>(esp_random()), static_cast<unsigned long>(esp_random()));
 
   JsonDocument doc;
   doc["event_id"] = eventId;
