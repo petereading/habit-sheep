@@ -245,7 +245,6 @@ void HomeActivity::onEnter() {
   if (habitSheepUi) {
     loadRecentBooks(1);
     hasContinueReading = !recentBooks.empty();
-    habitSheepUi->begin(hasContinueReading);
     HABIT_EVENTS.refreshToday();
     selectorIndex = 0;
     requestUpdate();
