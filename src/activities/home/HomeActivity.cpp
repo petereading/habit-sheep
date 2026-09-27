@@ -245,6 +245,7 @@ void HomeActivity::onEnter() {
     loadRecentBooks(1);
     hasContinueReading = !recentBooks.empty();
     HABIT_EVENTS.refreshToday();
+    lastHabitProgressStamp = UINT32_MAX;
     selectorIndex = 0;
     requestUpdate();
     return;
@@ -415,6 +416,17 @@ void HomeActivity::activateHabitSheepSelection() {
 
 void HomeActivity::loopHabitSheepHome() {
   if (!habitSheepUi) return;
+
+  uint32_t progressStamp = 0;
+  for (const auto& id : HABIT_SHEEP.getActiveHabitIds()) {
+    if (id.empty()) continue;
+    progressStamp = progressStamp * 31 + HABIT_TIMER.elapsedSecondsFor(id) / 60;
+    progressStamp = progressStamp * 31 + static_cast<uint8_t>(HABIT_TIMER.phaseFor(id));
+  }
+  if (progressStamp != lastHabitProgressStamp) {
+    lastHabitProgressStamp = progressStamp;
+    requestUpdate();
+  }
 
   if (habitReplacementPopup.isActive()) {
     habitReplacementPopup.handleInput(mappedInput, [this] { requestUpdate(); });

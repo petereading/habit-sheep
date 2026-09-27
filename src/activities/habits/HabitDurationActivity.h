@@ -1,7 +1,7 @@
 #pragma once
 
+#include <array>
 #include <string>
-#include <vector>
 
 #include "activities/Activity.h"
 #include "components/OptionPopup.h"
@@ -20,7 +20,12 @@ class HabitDurationActivity final : public Activity {
   int lastRenderedMinute = -1;
   OptionPopup addMinutesPopup;
 
-  std::vector<std::string> actionLabels() const;
+  struct ActionLabels {
+    std::array<const char*, 5> items{};
+    int count = 0;
+  };
+
+  ActionLabels actionLabels() const;
   void activate();
   void showAddMinutes();
   void continueReading();

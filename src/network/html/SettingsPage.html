@@ -853,17 +853,27 @@
     html += '<h3>Habit library (' + habitSheep.habits.length + '/9)</h3>';
     habitSheep.habits.forEach(function(habit, index) {
       html += '<div class="setting-row"><span class="setting-name">' + escapeHtml(habit.name) +
-        ' · ' + (habit.type === 'duration' ? habit.targetMinutes + ' min' : 'Completion') +
+        ' · ' + (habit.type === 'pomodoro' ? habit.targetMinutes + '/' + habit.shortBreakMinutes + '/' +
+        habit.longBreakMinutes + ' min · ' + habit.sessionsPerCycle + ' focus sessions' :
+        habit.type === 'duration' ? habit.targetMinutes + ' min' : 'Completion') +
         '</span><span class="setting-control"><button onclick="editHabit(' + index + ')">Edit</button> ' +
         '<button onclick="deleteHabit(' + index + ')">Delete</button></span></div>';
     });
     html += '<h3 id="habit-form-title">' + (editingHabitId ? 'Edit habit' : 'Add habit') + '</h3>' +
       '<div class="setting-row"><span class="setting-name">Name</span><input id="habit-name" type="text" maxlength="96"></div>' +
       '<div class="setting-row"><span class="setting-name">Type</span><select id="habit-type" onchange="updateHabitForm()">' +
-      '<option value="duration">Duration</option><option value="completion">Completion</option></select></div>' +
-      '<div class="setting-row" id="habit-target-row"><span class="setting-name">Daily target (minutes)</span>' +
+      '<option value="duration">Duration</option><option value="pomodoro">Pomodoro</option>' +
+      '<option value="completion">Completion</option></select></div>' +
+      '<div class="setting-row" id="habit-target-row"><span class="setting-name" id="habit-target-label">Daily target (minutes)</span>' +
       '<input id="habit-target" type="number" min="1" max="1440" value="25"></div>' +
-      '<div class="setting-row" id="habit-reading-row"><span class="setting-name">Reading integration</span>' +
+      '<div class="setting-row" id="habit-short-break-row"><span class="setting-name">Short break (minutes)</span>' +
+      '<input id="habit-short-break" type="number" min="1" max="120" value="5"></div>' +
+      '<div class="setting-row" id="habit-long-break-row"><span class="setting-name">Long break (minutes)</span>' +
+      '<input id="habit-long-break" type="number" min="1" max="120" value="15"></div>' +
+      '<div class="setting-row" id="habit-sessions-row"><span class="setting-name">Focus sessions per cycle</span>' +
+      '<input id="habit-sessions" type="number" min="1" max="12" value="4"></div>' +
+      '<div class="setting-row" id="habit-reading-row"><span class="setting-name">Reading shortcuts ' +
+      '(opens your book or file browser; start the timer to count reading time)</span>' +
       '<input id="habit-reading" type="checkbox"></div>' +
       '<button onclick="saveHabit()">' + (editingHabitId ? 'Save habit' : 'Add habit') + '</button> ' +
       '<button onclick="cancelHabitEdit()">Cancel</button></div>';
@@ -876,15 +886,22 @@
       document.getElementById('habit-name').value = editing.name;
       document.getElementById('habit-type').value = editing.type;
       document.getElementById('habit-target').value = editing.targetMinutes || 25;
+      document.getElementById('habit-short-break').value = editing.shortBreakMinutes || 5;
+      document.getElementById('habit-long-break').value = editing.longBreakMinutes || 15;
+      document.getElementById('habit-sessions').value = editing.sessionsPerCycle || 4;
       document.getElementById('habit-reading').checked = !!editing.readingIntegration;
     }
     updateHabitForm();
   }
 
   function updateHabitForm() {
-    const duration = document.getElementById('habit-type').value === 'duration';
-    document.getElementById('habit-target-row').style.display = duration ? '' : 'none';
-    document.getElementById('habit-reading-row').style.display = duration ? '' : 'none';
+    const type = document.getElementById('habit-type').value;
+    document.getElementById('habit-target-row').style.display = type !== 'completion' ? '' : 'none';
+    document.getElementById('habit-target-label').textContent = type === 'pomodoro' ? 'Focus (minutes)' : 'Daily target (minutes)';
+    document.getElementById('habit-reading-row').style.display = type === 'duration' ? '' : 'none';
+    ['habit-short-break-row', 'habit-long-break-row', 'habit-sessions-row'].forEach(function(id) {
+      document.getElementById(id).style.display = type === 'pomodoro' ? '' : 'none';
+    });
   }
 
   async function loadHabitSheep() {
@@ -929,12 +946,19 @@
     const name = document.getElementById('habit-name').value.trim();
     const type = document.getElementById('habit-type').value;
     const targetMinutes = Number(document.getElementById('habit-target').value);
-    if (!name || (type === 'duration' && (!Number.isInteger(targetMinutes) || targetMinutes < 1 || targetMinutes > 1440))) {
+    const shortBreakMinutes = Number(document.getElementById('habit-short-break').value);
+    const longBreakMinutes = Number(document.getElementById('habit-long-break').value);
+    const sessionsPerCycle = Number(document.getElementById('habit-sessions').value);
+    if (!name || (type !== 'completion' && (!Number.isInteger(targetMinutes) || targetMinutes < 1 || targetMinutes > 1440)) ||
+      (type === 'pomodoro' && (!Number.isInteger(shortBreakMinutes) || shortBreakMinutes < 1 || shortBreakMinutes > 120 ||
+      !Number.isInteger(longBreakMinutes) || longBreakMinutes < 1 || longBreakMinutes > 120 ||
+      !Number.isInteger(sessionsPerCycle) || sessionsPerCycle < 1 || sessionsPerCycle > 12))) {
       showMessage('Enter a name and a valid duration target.', true);
       return;
     }
     postHabitSheep({action: 'saveHabit', id: editingHabitId, name: name, type: type,
-      targetMinutes: type === 'duration' ? targetMinutes : 0,
+      targetMinutes: type === 'completion' ? 0 : targetMinutes,
+      shortBreakMinutes: shortBreakMinutes, longBreakMinutes: longBreakMinutes, sessionsPerCycle: sessionsPerCycle,
       readingIntegration: type === 'duration' && document.getElementById('habit-reading').checked});
     editingHabitId = '';
   }

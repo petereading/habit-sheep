@@ -39,6 +39,8 @@ class HabitLibraryActivity final : public UiListActivity {
   void showEditMenu(const std::string& habitId);
   void renameHabit(const std::string& habitId);
   void changeTarget(const std::string& habitId);
+  void changePomodoroBreak(const std::string& habitId, bool longBreak);
+  void changePomodoroSessions(const std::string& habitId);
   void toggleReadingIntegration(const std::string& habitId);
   void confirmDelete(const std::string& habitId);
 };

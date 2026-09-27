@@ -1370,10 +1370,17 @@ void CrossPointWebServer::handlePostHabitSheep() {
     const char* type = doc["type"] | "";
     const int minutes = doc["targetMinutes"] | 0;
     const bool duration = strcmp(type, "duration") == 0;
+    const bool pomodoro = strcmp(type, "pomodoro") == 0;
     const bool completion = strcmp(type, "completion") == 0;
+    const int shortBreak = doc["shortBreakMinutes"] | 5;
+    const int longBreak = doc["longBreakMinutes"] | 15;
+    const int sessions = doc["sessionsPerCycle"] | 4;
     const char* requestedId = doc["id"] | "";
-    if (*name && strlen(name) <= HabitSheepStore::MAX_NAME_BYTES && (duration || completion) &&
-        (!duration || (minutes > 0 && minutes <= 1440)) && (!*requestedId || HABIT_SHEEP.findHabit(requestedId))) {
+    if (*name && strlen(name) <= HabitSheepStore::MAX_NAME_BYTES && (duration || pomodoro || completion) &&
+        (completion || (minutes > 0 && minutes <= 1440)) &&
+        (!pomodoro || (shortBreak > 0 && shortBreak <= 120 && longBreak > 0 && longBreak <= 120 && sessions > 0 &&
+                       sessions <= 12)) &&
+        (!*requestedId || HABIT_SHEEP.findHabit(requestedId))) {
       char newId[32];
       const char* id = requestedId;
       if (!*id) {
@@ -1384,9 +1391,12 @@ void CrossPointWebServer::handlePostHabitSheep() {
       HabitDefinition habit;
       habit.id = id;
       habit.name = name;
-      habit.type = duration ? HabitType::Duration : HabitType::Completion;
-      habit.targetMinutes = duration ? static_cast<uint16_t>(minutes) : 0;
+      habit.type = pomodoro ? HabitType::Pomodoro : duration ? HabitType::Duration : HabitType::Completion;
+      habit.targetMinutes = completion ? 0 : static_cast<uint16_t>(minutes);
       habit.readingIntegration = duration && (doc["readingIntegration"] | false);
+      habit.shortBreakMinutes = static_cast<uint16_t>(shortBreak);
+      habit.longBreakMinutes = static_cast<uint16_t>(longBreak);
+      habit.sessionsPerCycle = static_cast<uint8_t>(sessions);
       valid = HABIT_SHEEP.upsertHabit(habit);
     }
   } else if (strcmp(action, "deleteHabit") == 0) {

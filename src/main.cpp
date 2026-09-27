@@ -26,6 +26,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "HabitSheepStore.h"
+#include "HabitTimer.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -437,6 +438,7 @@ void setup() {
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
   HABIT_SHEEP.loadFromFile();
+  HABIT_TIMER.loadFromFile();
   SHEEP_STATE.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
@@ -608,6 +610,8 @@ void loop() {
     }
     return;
   }
+
+  HABIT_TIMER.tick();
 
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 

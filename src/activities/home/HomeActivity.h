@@ -19,6 +19,7 @@ class HomeActivity final : public Activity {
   std::vector<std::string> habitReplacementIds;
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
+  uint32_t lastHabitProgressStamp = UINT32_MAX;
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;

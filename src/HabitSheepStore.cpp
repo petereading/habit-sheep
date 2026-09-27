@@ -8,11 +8,15 @@
 #include <utility>
 
 namespace {
-constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 2;
+constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 3;
 
-const char* habitTypeName(const HabitType type) { return type == HabitType::Duration ? "duration" : "completion"; }
+const char* habitTypeName(const HabitType type) {
+  if (type == HabitType::Pomodoro) return "pomodoro";
+  return type == HabitType::Duration ? "duration" : "completion";
+}
 
 HabitType parseHabitType(const char* value) {
+  if (value && std::string_view(value) == "pomodoro") return HabitType::Pomodoro;
   return value && std::string_view(value) == "duration" ? HabitType::Duration : HabitType::Completion;
 }
 }  // namespace
@@ -22,7 +26,7 @@ HabitSheepStore::HabitSheepStore() { seedDefaultHabits(); }
 void HabitSheepStore::seedDefaultHabits() {
   habits.reserve(2);
   habits.push_back({"reading", "Reading", HabitType::Duration, 30, true});
-  habits.push_back({"pomodoro", "Pomodoro", HabitType::Duration, 25, false});
+  habits.push_back({"pomodoro", "Pomodoro", HabitType::Pomodoro, 25, false});
   activeHabitIds[0] = "reading";
   activeHabitIds[1] = "pomodoro";
 }
@@ -51,6 +55,9 @@ void HabitSheepStore::toJson(JsonDocument& doc) const {
     obj["type"] = habitTypeName(habit.type);
     obj["targetMinutes"] = habit.targetMinutes;
     obj["readingIntegration"] = habit.readingIntegration;
+    obj["shortBreakMinutes"] = habit.shortBreakMinutes;
+    obj["longBreakMinutes"] = habit.longBreakMinutes;
+    obj["sessionsPerCycle"] = habit.sessionsPerCycle;
   }
 
   JsonArray activeArray = doc["activeHabitIds"].to<JsonArray>();
@@ -66,6 +73,7 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
   const char* storedSheepName = doc["sheepName"] | "";
   if (storedSheepName && strlen(storedSheepName) <= MAX_NAME_BYTES) sheepName = storedSheepName;
 
+  const uint8_t schema = doc["schema"] | static_cast<uint8_t>(1);
   JsonArrayConst habitArray = doc["habits"].as<JsonArrayConst>();
   habits.reserve(std::min(habitArray.size(), MAX_HABITS));
   for (JsonObjectConst obj : habitArray) {
@@ -79,9 +87,19 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
     if (!validId(habit.id) || !validName(habit.name) || findHabit(habit.id)) continue;
 
     habit.type = parseHabitType(obj["type"] | "completion");
+    if (schema < 3 && habit.id == "pomodoro" && habit.type == HabitType::Duration) {
+      habit.type = HabitType::Pomodoro;
+      requestResave();
+    }
     habit.targetMinutes = obj["targetMinutes"] | static_cast<uint16_t>(0);
     habit.readingIntegration = obj["readingIntegration"] | false;
-    if (habit.type == HabitType::Duration && habit.targetMinutes == 0) continue;
+    habit.shortBreakMinutes = obj["shortBreakMinutes"] | static_cast<uint16_t>(5);
+    habit.longBreakMinutes = obj["longBreakMinutes"] | static_cast<uint16_t>(15);
+    habit.sessionsPerCycle = obj["sessionsPerCycle"] | static_cast<uint8_t>(4);
+    if (habit.type != HabitType::Completion && habit.targetMinutes == 0) continue;
+    if (habit.type == HabitType::Pomodoro &&
+        (habit.shortBreakMinutes == 0 || habit.longBreakMinutes == 0 || habit.sessionsPerCycle == 0))
+      continue;
     if (habit.type == HabitType::Completion) {
       habit.targetMinutes = 0;
       habit.readingIntegration = false;
@@ -100,7 +118,7 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
 
   // Upgrade the original empty first-run configuration once. Schema 2 keeps
   // an intentionally emptied library empty on subsequent loads.
-  if ((doc["schema"] | static_cast<uint8_t>(1)) < HABIT_SHEEP_SCHEMA_VERSION && habits.empty()) {
+  if (schema < 2 && habits.empty()) {
     seedDefaultHabits();
     requestResave();
   }
@@ -123,11 +141,16 @@ bool HabitSheepStore::setSheepName(const std::string& name) {
 
 bool HabitSheepStore::upsertHabit(const HabitDefinition& habit) {
   if (!validId(habit.id) || !validName(habit.name)) return false;
-  if (habit.type == HabitType::Duration && habit.targetMinutes == 0) return false;
+  if (habit.type != HabitType::Completion && habit.targetMinutes == 0) return false;
+  if (habit.type == HabitType::Pomodoro &&
+      (habit.shortBreakMinutes == 0 || habit.longBreakMinutes == 0 || habit.sessionsPerCycle == 0))
+    return false;
 
   HabitDefinition normalized = habit;
   if (normalized.type == HabitType::Completion) {
     normalized.targetMinutes = 0;
+    normalized.readingIntegration = false;
+  } else if (normalized.type == HabitType::Pomodoro) {
     normalized.readingIntegration = false;
   }
 

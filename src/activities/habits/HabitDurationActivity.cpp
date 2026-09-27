@@ -11,6 +11,7 @@
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
+#include "I18n.h"
 #include "RecentBooksStore.h"
 #include "activities/ActivityManager.h"
 #include "components/UITheme.h"
@@ -18,7 +19,7 @@
 
 namespace {
 constexpr int SIDE_PAD = 24;
-constexpr int CONTENT_TOP = 150;
+constexpr int CONTENT_TOP = 190;
 constexpr int ROW_H = 58;
 }  // namespace
 
@@ -33,22 +34,27 @@ void HabitDurationActivity::onEnter() {
   requestUpdate();
 }
 
-std::vector<std::string> HabitDurationActivity::actionLabels() const {
-  std::vector<std::string> labels;
-  if (!HABIT_TIMER.isActive()) {
-    labels.emplace_back("Start timer");
-  } else if (HABIT_TIMER.isForHabit(habitId)) {
-    labels.emplace_back(HABIT_TIMER.isRunning() ? "Pause timer" : "Resume timer");
-    labels.emplace_back("Stop & log");
+HabitDurationActivity::ActionLabels HabitDurationActivity::actionLabels() const {
+  ActionLabels labels;
+  if (HABIT_TIMER.isForHabit(habitId)) {
+    if (HABIT_TIMER.isRunningFor(habitId))
+      labels.items[labels.count++] = "Pause timer";
+    else if (HABIT_TIMER.hasOtherRunning(habitId))
+      labels.items[labels.count++] = tr(STR_HABIT_PAUSE_OTHER);
+    else
+      labels.items[labels.count++] = "Resume timer";
+    labels.items[labels.count++] = "Stop & log";
+  } else if (HABIT_TIMER.isRunning()) {
+    labels.items[labels.count++] = tr(STR_HABIT_PAUSE_OTHER);
   } else {
-    labels.emplace_back("Another timer is active");
+    labels.items[labels.count++] = "Start timer";
   }
-  labels.emplace_back("+ Add minutes");
+  labels.items[labels.count++] = "+ Add minutes";
 
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   if (habit && habit->readingIntegration) {
-    labels.emplace_back("Continue reading");
-    labels.emplace_back("Browse files");
+    labels.items[labels.count++] = "Continue reading";
+    labels.items[labels.count++] = "Browse files";
   }
   return labels;
 }
@@ -79,31 +85,29 @@ void HabitDurationActivity::continueReading() {
 
 void HabitDurationActivity::activate() {
   const auto labels = actionLabels();
-  if (selection < 0 || selection >= static_cast<int>(labels.size())) return;
+  if (selection < 0 || selection >= labels.count) return;
 
   int index = 0;
-  if (!HABIT_TIMER.isActive()) {
+  if (!HABIT_TIMER.isForHabit(habitId)) {
     if (selection == index++) {
-      HABIT_TIMER.start(habitId);
-      requestUpdate();
-      return;
-    }
-  } else if (HABIT_TIMER.isForHabit(habitId)) {
-    if (selection == index++) {
-      if (HABIT_TIMER.isRunning())
-        HABIT_TIMER.pause();
-      else
-        HABIT_TIMER.resume();
-      requestUpdate();
-      return;
-    }
-    if (selection == index++) {
-      HABIT_TIMER.stopAndLog();
+      if (!HABIT_TIMER.hasOtherRunning(habitId)) HABIT_TIMER.start(habitId);
       requestUpdate();
       return;
     }
   } else {
-    if (selection == index++) return;
+    if (selection == index++) {
+      if (HABIT_TIMER.isRunningFor(habitId))
+        HABIT_TIMER.pause(habitId);
+      else if (!HABIT_TIMER.hasOtherRunning(habitId))
+        HABIT_TIMER.resume(habitId);
+      requestUpdate();
+      return;
+    }
+    if (selection == index++) {
+      HABIT_TIMER.stopAndLog(habitId);
+      requestUpdate();
+      return;
+    }
   }
 
   if (selection == index++) {
@@ -131,26 +135,26 @@ void HabitDurationActivity::loop() {
   }
 
   const auto labels = actionLabels();
-  if (labels.empty()) return;
-  selection = std::clamp(selection, 0, static_cast<int>(labels.size()) - 1);
+  if (labels.count == 0) return;
+  selection = std::clamp(selection, 0, labels.count - 1);
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     finish();
     return;
   }
-  if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
-    selection = (selection - 1 + labels.size()) % labels.size();
+  if (mappedInput.wasReleased(MappedInputManager::Button::NavPrevious)) {
+    selection = (selection - 1 + labels.count) % labels.count;
     requestUpdate();
     return;
   }
-  if (mappedInput.wasReleased(MappedInputManager::Button::Down)) {
-    selection = (selection + 1) % labels.size();
+  if (mappedInput.wasReleased(MappedInputManager::Button::NavNext)) {
+    selection = (selection + 1) % labels.count;
     requestUpdate();
     return;
   }
 
   int row = -1;
-  const auto touch = mappedInput.rowTouch(row, CONTENT_TOP, ROW_H, labels.size(), SIDE_PAD,
+  const auto touch = mappedInput.rowTouch(row, CONTENT_TOP, ROW_H, labels.count, SIDE_PAD,
                                           renderer.getScreenWidth() - SIDE_PAD, ROW_H);
   if (touch == MappedInputManager::RowTouch::Tap) {
     selection = row;
@@ -163,8 +167,8 @@ void HabitDurationActivity::loop() {
     return;
   }
 
-  if (HABIT_TIMER.isForHabit(habitId) && HABIT_TIMER.isRunning()) {
-    const int minute = static_cast<int>(HABIT_TIMER.elapsedSeconds() / 60);
+  if (HABIT_TIMER.isRunningFor(habitId)) {
+    const int minute = static_cast<int>(HABIT_TIMER.elapsedSecondsFor(habitId) / 60);
     if (minute != lastRenderedMinute) {
       lastRenderedMinute = minute;
       requestUpdate();
@@ -175,38 +179,63 @@ void HabitDurationActivity::loop() {
 void HabitDurationActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const int screenW = renderer.getScreenWidth();
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect header{0, metrics.topPadding, screenW, metrics.headerHeight};
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   if (!habit) {
-    GUI.drawHeader(renderer, Rect{0, 0, screenW, 90}, "Habit");
+    GUI.drawHeader(renderer, header, "Habit");
     renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 180, "Habit not found");
     renderer.displayBuffer();
     return;
   }
 
-  GUI.drawHeader(renderer, Rect{0, 0, screenW, 90}, habit->name.c_str());
+  GUI.drawHeader(renderer, header, habit->name.c_str());
 
   auto progress = HABIT_EVENTS.progressForToday(habitId);
-  if (HABIT_TIMER.isForHabit(habitId)) progress.durationSeconds += HABIT_TIMER.elapsedSeconds();
+  if (HABIT_TIMER.isForHabit(habitId) && HABIT_TIMER.phaseFor(habitId) == HabitTimer::Phase::Focus)
+    progress.durationSeconds += HABIT_TIMER.elapsedSecondsFor(habitId);
   const uint32_t minutes = progress.durationSeconds / 60;
 
   char progressText[40];
-  snprintf(progressText, sizeof(progressText), "%lu / %u min", static_cast<unsigned long>(minutes),
-           static_cast<unsigned>(habit->targetMinutes));
-  renderer.drawCenteredText(NOTOSANS_18_FONT_ID, 104, progressText);
+  if (habit->type == HabitType::Pomodoro)
+    snprintf(progressText, sizeof(progressText), tr(STR_HABIT_FOCUS_PROGRESS),
+             static_cast<unsigned>(progress.pomodoroSessions), static_cast<unsigned>(habit->sessionsPerCycle));
+  else
+    snprintf(progressText, sizeof(progressText), "%lu / %u min", static_cast<unsigned long>(minutes),
+             static_cast<unsigned>(habit->targetMinutes));
+  renderer.drawCenteredText(NOTOSANS_18_FONT_ID, 111, progressText);
+
+  if (habit->type == HabitType::Pomodoro && HABIT_TIMER.isForHabit(habitId)) {
+    const auto phase = HABIT_TIMER.phaseFor(habitId);
+    const char* label = phase == HabitTimer::Phase::Focus        ? tr(STR_HABIT_FOCUS)
+                        : phase == HabitTimer::Phase::ShortBreak ? tr(STR_HABIT_SHORT_BREAK)
+                                                                 : tr(STR_HABIT_LONG_BREAK);
+    const uint16_t target = phase == HabitTimer::Phase::Focus        ? habit->targetMinutes
+                            : phase == HabitTimer::Phase::ShortBreak ? habit->shortBreakMinutes
+                                                                     : habit->longBreakMinutes;
+    const uint32_t elapsed = HABIT_TIMER.elapsedSecondsFor(habitId);
+    char phaseText[40];
+    snprintf(phaseText, sizeof(phaseText), tr(STR_HABIT_PHASE_PROGRESS), label,
+             static_cast<unsigned long>(elapsed / 60), static_cast<unsigned>(target));
+    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 145, phaseText);
+  }
 
   const int barX = SIDE_PAD;
   const int barW = screenW - SIDE_PAD * 2;
-  renderer.drawRect(barX, 134, barW, 8, true);
-  const uint32_t targetSeconds = static_cast<uint32_t>(habit->targetMinutes) * 60;
-  const int fill =
-      targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
-  if (fill > 0) renderer.fillRect(barX + 2, 136, fill, 4, true);
+  renderer.drawRect(barX, 172, barW, 8, true);
+  const uint32_t targetSeconds =
+      static_cast<uint32_t>(habit->type == HabitType::Pomodoro ? habit->sessionsPerCycle : habit->targetMinutes * 60UL);
+  const uint32_t achieved = habit->type == HabitType::Pomodoro ? progress.pomodoroSessions : progress.durationSeconds;
+  const int fill = targetSeconds == 0 ? 0
+                                      : static_cast<int>(std::min<uint64_t>(
+                                            barW - 4, static_cast<uint64_t>(achieved) * (barW - 4) / targetSeconds));
+  if (fill > 0) renderer.fillRect(barX + 2, 174, fill, 4, true);
 
   const auto labels = actionLabels();
-  for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
+  for (int i = 0; i < labels.count; ++i) {
     const int y = CONTENT_TOP + i * ROW_H;
     if (i == selection) renderer.drawRoundedRect(SIDE_PAD, y + 4, barW, ROW_H - 8, 2, 10, true);
-    const auto shown = renderer.truncatedText(NOTOSANS_14_FONT_ID, labels[i].c_str(), barW - 32);
+    const auto shown = renderer.truncatedText(NOTOSANS_14_FONT_ID, labels.items[i], barW - 32);
     renderer.drawText(NOTOSANS_14_FONT_ID, SIDE_PAD + 16, y + 18, shown.c_str());
   }
 

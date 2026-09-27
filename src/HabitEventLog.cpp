@@ -100,6 +100,9 @@ bool HabitEventLog::refreshToday() {
             progress.completed = true;
           } else if (strcmp(type, "duration") == 0) {
             progress.durationSeconds += amount;
+          } else if (strcmp(type, "pomodoro") == 0) {
+            progress.durationSeconds += amount;
+            ++progress.pomodoroSessions;
           }
         }
       }
@@ -179,6 +182,10 @@ bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, co
   } else if (strcmp(type, "duration") == 0) {
     progress.durationSeconds += amount;
     SHEEP_STATE.recordDuration(amount);
+  } else if (strcmp(type, "pomodoro") == 0) {
+    progress.durationSeconds += amount;
+    ++progress.pomodoroSessions;
+    SHEEP_STATE.recordDuration(amount);
   }
   return true;
 }
@@ -193,4 +200,9 @@ bool HabitEventLog::appendDurationSeconds(const std::string& habitId, const uint
                                           const HabitEventSource source) {
   if (seconds == 0) return false;
   return appendEvent(habitId, "duration", seconds, "seconds", source);
+}
+
+bool HabitEventLog::appendPomodoroFocus(const std::string& habitId, const uint32_t seconds) {
+  if (seconds == 0) return false;
+  return appendEvent(habitId, "pomodoro", seconds, "seconds", HabitEventSource::Timer);
 }

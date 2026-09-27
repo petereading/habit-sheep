@@ -183,12 +183,24 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
       }
     } else {
       auto progress = HABIT_EVENTS.progressForToday(habit->id);
-      if (HABIT_TIMER.isForHabit(habit->id)) progress.durationSeconds += HABIT_TIMER.elapsedSeconds();
+      if (HABIT_TIMER.isForHabit(habit->id) && HABIT_TIMER.phaseFor(habit->id) == HabitTimer::Phase::Focus)
+        progress.durationSeconds += HABIT_TIMER.elapsedSecondsFor(habit->id);
       const uint32_t minutes = progress.durationSeconds / 60;
 
       char target[24];
-      snprintf(target, sizeof(target), "%lu/%um", static_cast<unsigned long>(minutes),
-               static_cast<unsigned>(habit->targetMinutes));
+      if (habit->type == HabitType::Pomodoro) {
+        const auto phase = HABIT_TIMER.phaseFor(habit->id);
+        const char phaseLetter = phase == HabitTimer::Phase::Focus ? 'F' : 'B';
+        if (HABIT_TIMER.isForHabit(habit->id))
+          snprintf(target, sizeof(target), "%u/%u %c%lum", static_cast<unsigned>(progress.pomodoroSessions),
+                   static_cast<unsigned>(habit->sessionsPerCycle), phaseLetter,
+                   static_cast<unsigned long>(HABIT_TIMER.elapsedSecondsFor(habit->id) / 60));
+        else
+          snprintf(target, sizeof(target), "%u/%u focus", static_cast<unsigned>(progress.pomodoroSessions),
+                   static_cast<unsigned>(habit->sessionsPerCycle));
+      } else
+        snprintf(target, sizeof(target), "%lu/%um", static_cast<unsigned long>(minutes),
+                 static_cast<unsigned>(habit->targetMinutes));
       const int targetW = renderer.getTextWidth(SMALL_FONT_ID, target);
       renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - 16 - targetW, y + 15, target);
 
@@ -196,9 +208,15 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
       const int barY = y + 39;
       const int barW = 86;
       renderer.drawRect(barX, barY, barW, 7, true);
-      const uint32_t targetSeconds = static_cast<uint32_t>(habit->targetMinutes) * 60;
-      const int fill =
-          targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
+      const uint32_t targetSeconds = habit->type == HabitType::Pomodoro
+                                         ? habit->sessionsPerCycle
+                                         : static_cast<uint32_t>(habit->targetMinutes) * 60;
+      const uint32_t achieved =
+          habit->type == HabitType::Pomodoro ? progress.pomodoroSessions : progress.durationSeconds;
+      const int fill = targetSeconds == 0
+                           ? 0
+                           : static_cast<int>(std::min<uint64_t>(
+                                 barW - 4, static_cast<uint64_t>(achieved) * (barW - 4) / targetSeconds));
       if (fill > 0) renderer.fillRect(barX + 2, barY + 2, fill, 3, true);
     }
   }
@@ -227,10 +245,12 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, const bool showDoc
   const int sheepHeight = std::max(0, habitsTop - sheepTop);
 
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const auto percentageText = std::to_string(powerManager.getBatteryPercentage()) + "%";
-  const int batteryX =
-      screenW - SIDE_PAD - metrics.batteryWidth - 4 - renderer.getTextWidth(SMALL_FONT_ID, percentageText.c_str());
-  GUI.drawBatteryLeft(renderer, Rect{batteryX, 12, metrics.batteryWidth, metrics.batteryHeight}, true);
+  char percentageText[8];
+  snprintf(percentageText, sizeof(percentageText), "%u%%", static_cast<unsigned>(powerManager.getBatteryPercentage()));
+  const int batteryX = screenW - metrics.headerSidePadding - 4 - metrics.batteryWidth - 4 -
+                       renderer.getTextWidth(SMALL_FONT_ID, percentageText);
+  const int batteryY = metrics.topPadding + (metrics.batteryBarHeight - metrics.batteryHeight) / 2;
+  GUI.drawBatteryLeft(renderer, Rect{batteryX, batteryY, metrics.batteryWidth, metrics.batteryHeight}, true);
 
   struct tm local{};
   if (halClock.isAvailable() && halClock.localTime(local)) {
@@ -258,7 +278,9 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   GUI.drawBatteryLeft(renderer,
-                      Rect{screenW - SIDE_PAD - metrics.batteryWidth, 12, metrics.batteryWidth, metrics.batteryHeight},
+                      Rect{screenW - metrics.headerSidePadding - 4 - metrics.batteryWidth,
+                           metrics.topPadding + (metrics.batteryBarHeight - metrics.batteryHeight) / 2,
+                           metrics.batteryWidth, metrics.batteryHeight},
                       false);
 
   const int habitBandH = 150;
@@ -281,6 +303,9 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
     char value[24];
     if (habit->type == HabitType::Completion) {
       snprintf(value, sizeof(value), "%s", progress.completed ? "Done" : "—");
+    } else if (habit->type == HabitType::Pomodoro) {
+      snprintf(value, sizeof(value), "%u/%u focus", static_cast<unsigned>(progress.pomodoroSessions),
+               static_cast<unsigned>(habit->sessionsPerCycle));
     } else {
       snprintf(value, sizeof(value), "%lu/%um", static_cast<unsigned long>(progress.durationSeconds / 60),
                static_cast<unsigned>(habit->targetMinutes));
