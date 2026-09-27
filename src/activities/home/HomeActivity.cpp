@@ -21,6 +21,7 @@
 #include "HabitSheepStore.h"
 #include "HabitEventLog.h"
 #include "HabitTimer.h"
+#include "SheepStateStore.h"
 #include "activities/habits/HabitDurationActivity.h"
 #include "activities/habits/HabitSheepSettingsActivity.h"
 #include "CrossPointState.h"
@@ -366,6 +367,7 @@ void HomeActivity::activateHabitSheepSelection() {
   const auto action = habitSheepUi->actionForSelection(selectorIndex);
   switch (action) {
     case HabitSheepHomeUi::Action::Sheep:
+      SHEEP_STATE.recordInteraction();
       habitSheepUi->nudgeSheep();
       requestUpdate();
       break;

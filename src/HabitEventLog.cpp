@@ -7,6 +7,8 @@
 #include <esp_mac.h>
 #include <esp_random.h>
 
+#include "SheepStateStore.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -173,8 +175,10 @@ bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, co
   auto& progress = progressEntry(habitId).progress;
   if (strcmp(type, "completion") == 0) {
     progress.completed = true;
+    SHEEP_STATE.recordCompletion();
   } else if (strcmp(type, "duration") == 0) {
     progress.durationSeconds += amount;
+    SHEEP_STATE.recordDuration(amount);
   }
   return true;
 }

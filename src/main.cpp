@@ -26,6 +26,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "HabitSheepStore.h"
+#include "SheepStateStore.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -436,6 +437,7 @@ void setup() {
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
   HABIT_SHEEP.loadFromFile();
+  SHEEP_STATE.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
