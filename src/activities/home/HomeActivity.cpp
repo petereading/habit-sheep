@@ -347,7 +347,11 @@ void HomeActivity::showHabitReplacementPicker(const int slot) {
     }
   }
 
-  habitReplacementPopup.show("Active habit", labels, current, [this, slot](const int selected) {
+  std::vector<const char*> options;
+  options.reserve(labels.size());
+  for (const auto& label : labels) options.push_back(label.c_str());
+  habitReplacementPopup.show("Active habit", options.data(), static_cast<int>(options.size()), current,
+                             [this, slot](const int selected) {
     if (selected < 0 || selected >= static_cast<int>(habitReplacementIds.size())) return;
     HABIT_SHEEP.setActiveHabit(slot, habitReplacementIds[selected]);
     requestUpdate();
