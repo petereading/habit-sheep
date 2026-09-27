@@ -19,6 +19,8 @@
 
 #include "CrossPointSettings.h"
 #include "HabitSheepStore.h"
+#include "HabitEventLog.h"
+#include "HabitTimer.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -241,6 +243,7 @@ void HomeActivity::onEnter() {
     loadRecentBooks(1);
     hasContinueReading = !recentBooks.empty();
     habitSheepUi->begin(hasContinueReading);
+    HABIT_EVENTS.refreshToday();
     selectorIndex = 0;
     requestUpdate();
     return;
@@ -324,10 +327,31 @@ void HomeActivity::activateHabitSheepSelection() {
       break;
     case HabitSheepHomeUi::Action::Habit1:
     case HabitSheepHomeUi::Action::Habit2:
-    case HabitSheepHomeUi::Action::Habit3:
-      // Habit detail / timer actions are added in the next vertical slice.
-      // Selection is already wired so no navigation contract needs to change.
+    case HabitSheepHomeUi::Action::Habit3: {
+      const int slot = static_cast<int>(action) - static_cast<int>(HabitSheepHomeUi::Action::Habit1);
+      const auto& active = HABIT_SHEEP.getActiveHabitIds();
+      if (slot < 0 || slot >= static_cast<int>(active.size()) || active[slot].empty()) break;
+      const HabitDefinition* habit = HABIT_SHEEP.findHabit(active[slot]);
+      if (!habit) break;
+
+      if (habit->type == HabitType::Completion) {
+        if (HABIT_EVENTS.appendCompletion(habit->id)) {
+          habitSheepUi->nudgeSheep();
+          requestUpdate();
+        }
+      } else if (!HABIT_TIMER.isActive()) {
+        HABIT_TIMER.start(habit->id);
+        requestUpdate();
+      } else if (HABIT_TIMER.isForHabit(habit->id)) {
+        if (HABIT_TIMER.isRunning()) {
+          HABIT_TIMER.pause();
+        } else {
+          HABIT_TIMER.resume();
+        }
+        requestUpdate();
+      }
       break;
+    }
     case HabitSheepHomeUi::Action::ContinueReading:
       if (hasContinueReading && !recentBooks.empty()) {
         onSelectBook(recentBooks[0].path);

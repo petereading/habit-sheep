@@ -11,6 +11,7 @@
 #include <algorithm>
 
 #include "CrossPointSettings.h"
+#include "HabitTimer.h"
 #include "OpdsServerStore.h"
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
@@ -360,7 +361,9 @@ void ActivityManager::popActivity() {
   pendingAction = PendingAction::Pop;
 }
 
-bool ActivityManager::preventAutoSleep() const { return currentActivity && currentActivity->preventAutoSleep(); }
+bool ActivityManager::preventAutoSleep() const {
+  return (currentActivity && currentActivity->preventAutoSleep()) || HABIT_TIMER.isRunning();
+}
 
 bool ActivityManager::requiresExclusiveStorageLoop() const {
   return currentActivity && currentActivity->requiresExclusiveStorageLoop();

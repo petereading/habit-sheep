@@ -7,6 +7,8 @@
 #include <cstdio>
 
 #include "HabitSheepStore.h"
+#include "HabitEventLog.h"
+#include "HabitTimer.h"
 #include "MappedInputManager.h"
 #include "components/icons/blocks.h"
 #include "components/icons/book.h"
@@ -126,12 +128,30 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
     if (!habit) {
       renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - 52, y + 22, "+");
     } else if (habit->type == HabitType::Completion) {
+      const auto progress = HABIT_EVENTS.progressForToday(habit->id);
       renderer.drawRoundedRect(screenW - SIDE_PAD - 42, y + 15, 22, 22, 2, 4, true);
+      if (progress.completed) {
+        renderer.drawLine(screenW - SIDE_PAD - 37, y + 27, screenW - SIDE_PAD - 31, y + 33, 2, true);
+        renderer.drawLine(screenW - SIDE_PAD - 31, y + 33, screenW - SIDE_PAD - 22, y + 20, 2, true);
+      }
     } else {
-      char target[18];
-      snprintf(target, sizeof(target), "%um", static_cast<unsigned>(habit->targetMinutes));
+      auto progress = HABIT_EVENTS.progressForToday(habit->id);
+      if (HABIT_TIMER.isForHabit(habit->id)) progress.durationSeconds += HABIT_TIMER.elapsedSeconds();
+      const uint32_t minutes = progress.durationSeconds / 60;
+
+      char target[24];
+      snprintf(target, sizeof(target), "%lu/%um", static_cast<unsigned long>(minutes),
+               static_cast<unsigned>(habit->targetMinutes));
       const int targetW = renderer.getTextWidth(SMALL_FONT_ID, target);
-      renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - 16 - targetW, y + 22, target);
+      renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - 16 - targetW, y + 15, target);
+
+      const int barX = screenW - SIDE_PAD - 104;
+      const int barY = y + 39;
+      const int barW = 86;
+      renderer.drawRect(barX, barY, barW, 7, true);
+      const uint32_t targetSeconds = static_cast<uint32_t>(habit->targetMinutes) * 60;
+      const int fill = targetSeconds == 0 ? 0 : std::min<int>(barW - 4, progress.durationSeconds * (barW - 4) / targetSeconds);
+      if (fill > 0) renderer.fillRect(barX + 2, barY + 2, fill, 3, true);
     }
   }
 }
