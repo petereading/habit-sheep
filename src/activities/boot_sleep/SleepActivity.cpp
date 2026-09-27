@@ -24,6 +24,8 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HabitSheepStore.h"
+#include "components/HabitSheepHomeUi.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -524,6 +526,10 @@ void SleepActivity::onEnter() {
   // night-mode reader render.
   display.setInverted(false);
 
+  // Habit Sheep owns the normal sleep scene in this fork. Quick Resume above
+  // remains an explicit user override.
+  return renderHabitSheepSleepScreen();
+
   if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM) {
     // Transparent mode retains the current framebuffer. Materialize any
     // output-level inversion first so the retained content keeps its visible
@@ -616,6 +622,12 @@ void SleepActivity::renderCustomSleepScreen() const {
 // firmware's only clean refresh in normal operation is the single-pass 0xD7
 // sequence, used once for the sleep image. It never runs the multi-flash GC
 // waveform (0xF7) that FULL_REFRESH selects (#2471's blinking complaint).
+void SleepActivity::renderHabitSheepSleepScreen() const {
+  HabitSheepHomeUi sleepUi(renderer);
+  sleepUi.renderSleepUi(HABIT_SHEEP);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+}
+
 void SleepActivity::renderDefaultSleepScreen() const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();

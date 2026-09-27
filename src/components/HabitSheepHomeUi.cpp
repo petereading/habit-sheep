@@ -2,13 +2,16 @@
 
 #include <GfxRenderer.h>
 #include <HalPowerManager.h>
+#include <HalClock.h>
 
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
 
 #include "HabitSheepStore.h"
 #include "HabitEventLog.h"
 #include "HabitTimer.h"
+#include "SheepStateStore.h"
 #include "MappedInputManager.h"
 #include "components/icons/blocks.h"
 #include "components/icons/book.h"
@@ -98,6 +101,22 @@ int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
   return -1;
 }
 
+void HabitSheepHomeUi::drawPasture(const int x, const int y, const int width, const int height) const {
+  const int groundY = y + height - 28;
+  renderer.drawLine(x + 8, groundY, x + width - 8, groundY, 2, true);
+
+  const int level = std::min<int>(8, SHEEP_STATE.getPasturePoints() / 20);
+  const int span = std::max(48, width - 56);
+  for (int i = 0; i < level; ++i) {
+    const int px = x + 28 + (i * 47) % span;
+    const int py = groundY - 5 - (i % 2) * 7;
+    renderer.drawLine(px, py, px, py - 14, true);
+    renderer.drawLine(px, py - 11, px - 5, py - 16, true);
+    renderer.drawLine(px, py - 11, px + 5, py - 16, true);
+    if (i >= 4) renderer.fillRect(px - 2, py - 20, 5, 5, true);
+  }
+}
+
 void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, const int height, const char* name) const {
   if (selection == 0) renderer.drawRoundedRect(x, y, width, height, 2, 16, true);
 
@@ -107,6 +126,7 @@ void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, cons
   const int bodyX = cx - bodyW / 2;
   const int bodyY = y + std::max(42, height / 2 - 55);
 
+  drawPasture(x, y, width, height);
   renderer.drawRoundedRect(bodyX, bodyY, bodyW, bodyH, 3, 28, true);
   renderer.fillRoundedRect(bodyX + bodyW - 34, bodyY + 22, 46, 48, 14, Color::Black);
   renderer.fillRect(bodyX + 24, bodyY + bodyH - 2, 8, 28, true);
@@ -199,7 +219,61 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store) const {
   const uint16_t bucket = static_cast<uint16_t>(std::min(100, ((rawBattery + 5) / 10) * 10));
   GUI.fillBatteryIcon(renderer, Rect{screenW - 42, 16, 24, 18}, bucket);
 
+  struct tm local {};
+  if (halClock.isAvailable() && halClock.localTime(local)) {
+    char dateText[24];
+    strftime(dateText, sizeof(dateText), "%a %d %b", &local);
+    renderer.drawText(SMALL_FONT_ID, SIDE_PAD, 18, dateText);
+  }
+
   drawSheep(SIDE_PAD, sheepTop + 4, screenW - SIDE_PAD * 2, sheepHeight - 8, store.getSheepName().c_str());
   drawHabitRows(store, habitsTop, HABIT_ROW_H);
   drawDock(screenH - DOCK_H, DOCK_H);
+}
+
+
+void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  renderer.clearScreen();
+
+  struct tm local {};
+  if (halClock.isAvailable() && halClock.localTime(local)) {
+    char dateText[32];
+    strftime(dateText, sizeof(dateText), "%A %d %b", &local);
+    renderer.drawText(UI_12_FONT_ID, SIDE_PAD, 22, dateText);
+  }
+
+  const uint16_t rawBattery = powerManager.getBatteryPercentage();
+  const uint16_t bucket = static_cast<uint16_t>(std::min(100, ((rawBattery + 5) / 10) * 10));
+  GUI.fillBatteryIcon(renderer, Rect{screenW - 42, 18, 24, 18}, bucket);
+
+  const int habitBandH = 150;
+  const int sheepTop = 64;
+  const int sheepBottom = screenH - habitBandH - 24;
+  drawSheep(SIDE_PAD, sheepTop, screenW - SIDE_PAD * 2, sheepBottom - sheepTop, store.getSheepName().c_str());
+
+  const auto& active = store.getActiveHabitIds();
+  int row = 0;
+  for (int i = 0; i < 3; ++i) {
+    if (active[i].empty()) continue;
+    const HabitDefinition* habit = store.findHabit(active[i]);
+    if (!habit) continue;
+
+    const int y = screenH - habitBandH + row * 42;
+    const auto name = renderer.truncatedText(SMALL_FONT_ID, habit->name.c_str(), screenW - SIDE_PAD * 2 - 100);
+    renderer.drawText(SMALL_FONT_ID, SIDE_PAD, y, name.c_str());
+
+    const auto progress = HABIT_EVENTS.progressForToday(habit->id);
+    char value[24];
+    if (habit->type == HabitType::Completion) {
+      snprintf(value, sizeof(value), "%s", progress.completed ? "Done" : "—");
+    } else {
+      snprintf(value, sizeof(value), "%lu/%um", static_cast<unsigned long>(progress.durationSeconds / 60),
+               static_cast<unsigned>(habit->targetMinutes));
+    }
+    const int valueW = renderer.getTextWidth(SMALL_FONT_ID, value);
+    renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - valueW, y, value);
+    ++row;
+  }
 }

@@ -3,6 +3,7 @@
 #include <GfxRenderer.h>
 #include <esp_random.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <utility>
 
