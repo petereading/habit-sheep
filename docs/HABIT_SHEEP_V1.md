@@ -140,6 +140,10 @@ API keys:
 
 Remote AI should receive only minimal behavioural state where possible, not habit names or unnecessary personal text. It chooses from a bounded action vocabulary; invalid/failed responses immediately fall back to local rules. AI must never block Home, habit logging, sleep, or reading.
 
+## Upstream relationship
+
+CrossPoint is a read-only upstream. Habit Sheep only pulls/merges upstream changes into this repository; Habit Sheep-specific commits are never pushed back upstream. See `docs/UPSTREAM_POLICY.md`.
+
 ## Initial engineering direction
 
 Keep the fork close to upstream CrossPoint:
