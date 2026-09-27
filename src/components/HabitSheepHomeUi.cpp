@@ -13,6 +13,7 @@
 #include "HabitTimer.h"
 #include "MappedInputManager.h"
 #include "SheepStateStore.h"
+#include "components/UITheme.h"
 #include "components/icons/blocks.h"
 #include "components/icons/book.h"
 #include "components/icons/folder.h"
@@ -54,9 +55,7 @@ void HabitSheepHomeUi::setSelection(const int value) { selection = std::clamp(va
 
 int HabitSheepHomeUi::nextSelection(const int value) { return (value + 1 + SELECTION_COUNT) % SELECTION_COUNT; }
 
-int HabitSheepHomeUi::previousSelection(const int value) {
-  return (value - 1 + SELECTION_COUNT) % SELECTION_COUNT;
-}
+int HabitSheepHomeUi::previousSelection(const int value) { return (value - 1 + SELECTION_COUNT) % SELECTION_COUNT; }
 
 HabitSheepHomeUi::Action HabitSheepHomeUi::actionForSelection(const int value) {
   if (value < 0 || value >= SELECTION_COUNT) return Action::None;

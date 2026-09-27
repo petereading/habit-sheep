@@ -3,7 +3,6 @@
 #include <GfxRenderer.h>
 
 #include <algorithm>
-
 #include <utility>
 
 #include "HabitSheepStore.h"
@@ -41,8 +40,8 @@ void ActiveHabitsActivity::showPicker(const int slot) {
   pickerIds.emplace_back("");
 
   for (const auto& habit : HABIT_SHEEP.getHabits()) {
-    const bool usedElsewhere =
-        std::any_of(active.begin(), active.end(), [&](const std::string& id) { return id == habit.id && id != active[slot]; });
+    const bool usedElsewhere = std::any_of(active.begin(), active.end(),
+                                           [&](const std::string& id) { return id == habit.id && id != active[slot]; });
     if (usedElsewhere) continue;
     labels.push_back(habit.name);
     pickerIds.push_back(habit.id);

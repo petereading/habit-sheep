@@ -126,7 +126,8 @@ bool HabitSheepStore::upsertHabit(const HabitDefinition& habit) {
 }
 
 bool HabitSheepStore::removeHabit(const std::string& id) {
-  const auto it = std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& habit) { return habit.id == id; });
+  const auto it =
+      std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& habit) { return habit.id == id; });
   if (it == habits.end()) return false;
 
   habits.erase(it);
