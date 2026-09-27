@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
+#include "HabitSheepStore.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -231,6 +232,21 @@ void HomeActivity::onEnter() {
   hasOpdsServers = OPDS_STORE.hasServers();
 
   const auto& metrics = UITheme::getInstance().getMetrics();
+
+  // Habit Sheep is the default home for this fork. Keep it as a screen-lifetime
+  // component owned by HomeActivity so ActivityManager and upstream Home
+  // semantics stay unchanged. Fall back to the upstream home on allocation failure.
+  habitSheepUi = makeUniqueNoThrow<HabitSheepHomeUi>(renderer);
+  if (habitSheepUi) {
+    loadRecentBooks(1);
+    hasContinueReading = !recentBooks.empty();
+    habitSheepUi->begin(hasContinueReading);
+    selectorIndex = 0;
+    requestUpdate();
+    return;
+  }
+  LOG_ERR("HABIT", "OOM: Habit Sheep home; using upstream home");
+
   if (UITheme::getInstance().hasCoverGridHome()) {
     // Screen-lifetime interaction tables and component properties exceed the stack budget.
     coverGridUi = makeUniqueNoThrow<CoverGridHomeUi>(renderer);
@@ -254,6 +270,7 @@ void HomeActivity::onEnter() {
 void HomeActivity::onExit() {
   Activity::onExit();
 
+  habitSheepUi.reset();
   coverGridUi.reset();
 
   // Free the stored cover buffer if any
@@ -296,7 +313,85 @@ void HomeActivity::freeCoverBuffer() {
   coverBufferStored = false;
 }
 
+void HomeActivity::activateHabitSheepSelection() {
+  if (!habitSheepUi) return;
+
+  const auto action = habitSheepUi->actionForSelection(selectorIndex);
+  switch (action) {
+    case HabitSheepHomeUi::Action::Sheep:
+      habitSheepUi->nudgeSheep();
+      requestUpdate();
+      break;
+    case HabitSheepHomeUi::Action::Habit1:
+    case HabitSheepHomeUi::Action::Habit2:
+    case HabitSheepHomeUi::Action::Habit3:
+      // Habit detail / timer actions are added in the next vertical slice.
+      // Selection is already wired so no navigation contract needs to change.
+      break;
+    case HabitSheepHomeUi::Action::ContinueReading:
+      if (hasContinueReading && !recentBooks.empty()) {
+        onSelectBook(recentBooks[0].path);
+      } else {
+        onFileBrowserOpen();
+      }
+      break;
+    case HabitSheepHomeUi::Action::BrowseFiles:
+      onFileBrowserOpen();
+      break;
+    case HabitSheepHomeUi::Action::Library:
+      onLibraryOpen();
+      break;
+    case HabitSheepHomeUi::Action::Opds:
+      onOpdsBrowserOpen();
+      break;
+    case HabitSheepHomeUi::Action::Transfer:
+      onFileTransferOpen();
+      break;
+    case HabitSheepHomeUi::Action::Settings:
+      onSettingsOpen();
+      break;
+    case HabitSheepHomeUi::Action::None:
+      break;
+  }
+}
+
+void HomeActivity::loopHabitSheepHome() {
+  if (!habitSheepUi) return;
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+    selectorIndex = habitSheepUi->previousSelection(selectorIndex);
+    requestUpdate();
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Down)) {
+    selectorIndex = habitSheepUi->nextSelection(selectorIndex);
+    requestUpdate();
+    return;
+  }
+
+  // Preserve CrossPoint's Home shortcut: Back resumes the most recent book.
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) && hasContinueReading && !recentBooks.empty()) {
+    onSelectBook(recentBooks[0].path);
+    return;
+  }
+
+  const int touched = habitSheepUi->selectedAction(mappedInput);
+  if (touched >= 0) {
+    selectorIndex = touched;
+    activateHabitSheepSelection();
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    activateHabitSheepSelection();
+  }
+}
+
 void HomeActivity::loop() {
+  if (habitSheepUi) {
+    loopHabitSheepHome();
+    return;
+  }
   const int menuCount = getMenuItemCount();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
@@ -450,6 +545,15 @@ void HomeActivity::loop() {
 }
 
 void HomeActivity::render(RenderLock&&) {
+  if (habitSheepUi) {
+    renderer.clearScreen();
+    habitSheepUi->setSelection(selectorIndex);
+    habitSheepUi->renderUi(HABIT_SHEEP);
+    renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH
+                                                                   : HalDisplay::FAST_REFRESH);
+    firstRenderDone = true;
+    return;
+  }
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();

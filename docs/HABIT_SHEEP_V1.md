@@ -144,7 +144,7 @@ Remote AI should receive only minimal behavioural state where possible, not habi
 
 Keep the fork close to upstream CrossPoint:
 - dedicated Habit Sheep modules for habit state/events, sheep state/pasture, behaviour policy, and UI;
-- a Habit Sheep Home activity selected by a setting rather than rewriting unrelated screens;
+- a Habit Sheep Home UI component owned by the existing HomeActivity, keeping ActivityManager/Home semantics upstream-compatible while avoiding unrelated screen changes;
 - reuse CrossPoint input abstraction, icons, reader navigation, web settings, storage/HAL, and sleep infrastructure;
 - keep device-specific code behind existing HAL/capability boundaries;
 - minimise RAM use and avoid full-screen duplicate buffers on ESP32-C3.
