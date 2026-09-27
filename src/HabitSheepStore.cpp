@@ -3,6 +3,9 @@
 #include <Logging.h>
 
 #include <algorithm>
+#include <cstring>
+#include <string_view>
+#include <utility>
 
 namespace {
 constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 1;
