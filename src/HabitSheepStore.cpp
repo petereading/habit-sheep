@@ -101,15 +101,17 @@ bool HabitSheepStore::upsertHabit(const HabitDefinition& habit) {
   if (!validId(habit.id) || !validName(habit.name)) return false;
   if (habit.type == HabitType::Duration && habit.targetMinutes == 0) return false;
 
-  auto it = std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& item) { return item.id == habit.id; });
+  HabitDefinition normalized = habit;
+  if (normalized.type == HabitType::Completion) normalized.targetMinutes = 0;
+
+  auto it =
+      std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& item) { return item.id == normalized.id; });
   if (it == habits.end()) {
     if (habits.size() >= MAX_HABITS) return false;
-    habits.push_back(habit);
+    habits.push_back(std::move(normalized));
   } else {
-    *it = habit;
+    *it = std::move(normalized);
   }
-  if (habits.back().type == HabitType::Completion && habits.back().id == habit.id) habits.back().targetMinutes = 0;
-  if (it != habits.end() && it->type == HabitType::Completion) it->targetMinutes = 0;
   return saveToFile();
 }
 
