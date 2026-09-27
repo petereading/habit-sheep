@@ -26,7 +26,6 @@ class HabitSheepHomeUi {
 
   explicit HabitSheepHomeUi(GfxRenderer& renderer) : renderer(renderer) {}
 
-  void begin(bool hasContinueReadingValue) { hasContinueReading = hasContinueReadingValue; }
   void setSelection(int value);
   int nextSelection(int value) const;
   int previousSelection(int value) const;
@@ -41,10 +40,9 @@ class HabitSheepHomeUi {
  private:
   GfxRenderer& renderer;
   int selection = 0;
-  bool hasContinueReading = false;
   uint8_t sheepNudge = 0;
 
-  void drawSheep(int x, int y, int width, int height, const char* name) const;
+  void drawSheep(int x, int y, int width, int height, const char* name, bool showSelection = true) const;
   void drawPasture(int x, int y, int width, int height) const;
   void drawHabitRows(const HabitSheepStore& store, int top, int height) const;
   void drawDock(int top, int height) const;
