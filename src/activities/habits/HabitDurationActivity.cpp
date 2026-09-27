@@ -175,7 +175,6 @@ void HabitDurationActivity::loop() {
 void HabitDurationActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const int screenW = renderer.getScreenWidth();
-  const int screenH = renderer.getScreenHeight();
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   if (!habit) {
     GUI.drawHeader(renderer, Rect{0, 0, screenW, 90}, "Habit");
