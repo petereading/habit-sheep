@@ -33,6 +33,7 @@ bool HabitSheepStore::isActiveElsewhere(const size_t slot, const std::string& ha
 void HabitSheepStore::toJson(JsonDocument& doc) const {
   doc["schema"] = HABIT_SHEEP_SCHEMA_VERSION;
   doc["sheepName"] = sheepName;
+  doc["sleepSceneEnabled"] = sleepSceneEnabled;
 
   JsonArray habitArray = doc["habits"].to<JsonArray>();
   for (const auto& habit : habits) {
@@ -52,6 +53,7 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
   sheepName.clear();
   habits.clear();
   activeHabitIds.fill("");
+  sleepSceneEnabled = doc["sleepSceneEnabled"] | true;
 
   const char* storedSheepName = doc["sheepName"] | "";
   if (storedSheepName && strlen(storedSheepName) <= MAX_NAME_BYTES) sheepName = storedSheepName;
@@ -139,5 +141,11 @@ bool HabitSheepStore::setActiveHabit(const size_t slot, const std::string& habit
   if (slot >= activeHabitIds.size()) return false;
   if (!habitId.empty() && (!findHabit(habitId) || isActiveElsewhere(slot, habitId))) return false;
   activeHabitIds[slot] = habitId;
+  return saveToFile();
+}
+
+
+bool HabitSheepStore::setSleepSceneEnabled(const bool enabled) {
+  sleepSceneEnabled = enabled;
   return saveToFile();
 }
