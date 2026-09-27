@@ -12,7 +12,7 @@ class HabitSheepSettingsActivity final : public UiListActivity {
   void onEnter() override;
 
  private:
-  static constexpr int ROW_COUNT = 4;
+  static constexpr int ROW_COUNT = 5;
   std::array<std::string, ROW_COUNT> values;
   std::array<freeink::ui::ListItem, ROW_COUNT> rows{};
 
