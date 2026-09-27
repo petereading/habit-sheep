@@ -72,7 +72,10 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
     habit.targetMinutes = obj["targetMinutes"] | static_cast<uint16_t>(0);
     habit.readingIntegration = obj["readingIntegration"] | false;
     if (habit.type == HabitType::Duration && habit.targetMinutes == 0) continue;
-    if (habit.type == HabitType::Completion) habit.targetMinutes = 0;
+    if (habit.type == HabitType::Completion) {
+      habit.targetMinutes = 0;
+      habit.readingIntegration = false;
+    }
     habits.push_back(std::move(habit));
   }
 
@@ -105,7 +108,10 @@ bool HabitSheepStore::upsertHabit(const HabitDefinition& habit) {
   if (habit.type == HabitType::Duration && habit.targetMinutes == 0) return false;
 
   HabitDefinition normalized = habit;
-  if (normalized.type == HabitType::Completion) normalized.targetMinutes = 0;
+  if (normalized.type == HabitType::Completion) {
+    normalized.targetMinutes = 0;
+    normalized.readingIntegration = false;
+  }
 
   auto it =
       std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& item) { return item.id == normalized.id; });
