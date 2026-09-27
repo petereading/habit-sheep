@@ -81,6 +81,23 @@ int HabitSheepHomeUi::selectedAction(MappedInputManager& input) const {
   return -1;
 }
 
+int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
+  const int screenH = renderer.getScreenHeight();
+  const int habitsTop = screenH - DOCK_H - 3 * HABIT_ROW_H;
+
+  int x = 0;
+  int y = 0;
+  if (input.wasScreenLongPress(x, y) && x >= SIDE_PAD && x < renderer.getScreenWidth() - SIDE_PAD &&
+      y >= habitsTop && y < habitsTop + 3 * HABIT_ROW_H) {
+    return (y - habitsTop) / HABIT_ROW_H;
+  }
+
+  if (selection >= 1 && selection <= 3 && input.wasLongPressed(MappedInputManager::Button::Confirm, 700)) {
+    return selection - 1;
+  }
+  return -1;
+}
+
 void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, const int height, const char* name) const {
   if (selection == 0) renderer.drawRoundedRect(x, y, width, height, 2, 16, true);
 

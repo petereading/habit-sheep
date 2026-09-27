@@ -7,6 +7,7 @@
 #include "activities/Activity.h"
 #include "components/CoverGridHomeUi.h"
 #include "components/HabitSheepHomeUi.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 struct Rect;
@@ -14,6 +15,8 @@ struct Rect;
 class HomeActivity final : public Activity {
   std::unique_ptr<CoverGridHomeUi> coverGridUi;
   std::unique_ptr<HabitSheepHomeUi> habitSheepUi;
+  OptionPopup habitReplacementPopup;
+  std::vector<std::string> habitReplacementIds;
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
   bool recentsLoading = false;
@@ -79,6 +82,7 @@ class HomeActivity final : public Activity {
   void loadGridCover(RecentBook& book, int height, bool& showingLoading, Rect& popupRect);
   void loopHabitSheepHome();
   void activateHabitSheepSelection();
+  void showHabitReplacementPicker(int slot);
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,

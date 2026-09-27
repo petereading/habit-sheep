@@ -21,6 +21,7 @@
 #include "HabitSheepStore.h"
 #include "HabitEventLog.h"
 #include "HabitTimer.h"
+#include "activities/habits/HabitDurationActivity.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -316,6 +317,44 @@ void HomeActivity::freeCoverBuffer() {
   coverBufferStored = false;
 }
 
+void HomeActivity::showHabitReplacementPicker(const int slot) {
+  if (slot < 0 || slot >= static_cast<int>(HabitSheepStore::MAX_ACTIVE_HABITS)) return;
+
+  std::vector<std::string> labels;
+  habitReplacementIds.clear();
+  labels.emplace_back("Empty slot");
+  habitReplacementIds.emplace_back("");
+
+  const auto& active = HABIT_SHEEP.getActiveHabitIds();
+  for (const auto& habit : HABIT_SHEEP.getHabits()) {
+    bool usedElsewhere = false;
+    for (int i = 0; i < static_cast<int>(active.size()); ++i) {
+      if (i != slot && active[i] == habit.id) {
+        usedElsewhere = true;
+        break;
+      }
+    }
+    if (usedElsewhere) continue;
+    labels.push_back(habit.name);
+    habitReplacementIds.push_back(habit.id);
+  }
+
+  int current = 0;
+  for (int i = 1; i < static_cast<int>(habitReplacementIds.size()); ++i) {
+    if (habitReplacementIds[i] == active[slot]) {
+      current = i;
+      break;
+    }
+  }
+
+  habitReplacementPopup.show("Active habit", labels, current, [this, slot](const int selected) {
+    if (selected < 0 || selected >= static_cast<int>(habitReplacementIds.size())) return;
+    HABIT_SHEEP.setActiveHabit(slot, habitReplacementIds[selected]);
+    requestUpdate();
+  });
+  requestUpdate();
+}
+
 void HomeActivity::activateHabitSheepSelection() {
   if (!habitSheepUi) return;
 
@@ -339,16 +378,9 @@ void HomeActivity::activateHabitSheepSelection() {
           habitSheepUi->nudgeSheep();
           requestUpdate();
         }
-      } else if (!HABIT_TIMER.isActive()) {
-        HABIT_TIMER.start(habit->id);
-        requestUpdate();
-      } else if (HABIT_TIMER.isForHabit(habit->id)) {
-        if (HABIT_TIMER.isRunning()) {
-          HABIT_TIMER.pause();
-        } else {
-          HABIT_TIMER.resume();
-        }
-        requestUpdate();
+      } else {
+        auto detail = makeUniqueNoThrow<HabitDurationActivity>(renderer, mappedInput, habit->id);
+        if (detail) activityManager.pushActivity(std::move(detail));
       }
       break;
     }
@@ -381,6 +413,17 @@ void HomeActivity::activateHabitSheepSelection() {
 
 void HomeActivity::loopHabitSheepHome() {
   if (!habitSheepUi) return;
+
+  if (habitReplacementPopup.isActive()) {
+    habitReplacementPopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    return;
+  }
+
+  const int longPressedSlot = habitSheepUi->longPressedHabit(mappedInput);
+  if (longPressedSlot >= 0) {
+    showHabitReplacementPicker(longPressedSlot);
+    return;
+  }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
     selectorIndex = habitSheepUi->previousSelection(selectorIndex);
@@ -573,6 +616,7 @@ void HomeActivity::render(RenderLock&&) {
     renderer.clearScreen();
     habitSheepUi->setSelection(selectorIndex);
     habitSheepUi->renderUi(HABIT_SHEEP);
+    if (habitReplacementPopup.processRender(renderer, mappedInput)) return;
     renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH
                                                                    : HalDisplay::FAST_REFRESH);
     firstRenderDone = true;
