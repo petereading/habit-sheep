@@ -117,8 +117,8 @@ void HabitSheepHomeUi::drawPasture(const int x, const int y, const int width, co
   }
 }
 
-void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, const int height, const char* name) const {
-  if (selection == 0) renderer.drawRoundedRect(x, y, width, height, 2, 16, true);
+void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, const int height, const char* name, const bool showSelection) const {
+  if (showSelection && selection == 0) renderer.drawRoundedRect(x, y, width, height, 2, 16, true);
 
   const int cx = x + width / 2;
   const int bodyW = std::min(150, width / 2);
@@ -216,7 +216,7 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store) const {
   const int sheepHeight = std::max(0, habitsTop - sheepTop);
 
   const uint16_t rawBattery = powerManager.getBatteryPercentage();
-  const uint16_t bucket = static_cast<uint16_t>(std::min(100, ((rawBattery + 5) / 10) * 10));
+  const uint16_t bucket = static_cast<uint16_t>(std::min(100, (rawBattery / 10) * 10));
   GUI.fillBatteryIcon(renderer, Rect{screenW - 42, 16, 24, 18}, bucket);
 
   struct tm local {};
@@ -251,7 +251,7 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
   const int habitBandH = 150;
   const int sheepTop = 64;
   const int sheepBottom = screenH - habitBandH - 24;
-  drawSheep(SIDE_PAD, sheepTop, screenW - SIDE_PAD * 2, sheepBottom - sheepTop, store.getSheepName().c_str());
+  drawSheep(SIDE_PAD, sheepTop, screenW - SIDE_PAD * 2, sheepBottom - sheepTop, store.getSheepName().c_str(), false);
 
   const auto& active = store.getActiveHabitIds();
   int row = 0;
