@@ -20,6 +20,7 @@ class HomeActivity final : public Activity {
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
   uint32_t lastHabitProgressStamp = UINT32_MAX;
+  bool habitRewardPending = false;
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;

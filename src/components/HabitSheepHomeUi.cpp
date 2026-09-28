@@ -173,7 +173,7 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
     if (selection == 1 + i) renderer.drawRoundedRect(SIDE_PAD, y + 4, screenW - SIDE_PAD * 2, height - 8, 2, 10, true);
     const char* name = habit->name.c_str();
     const auto shown = renderer.truncatedText(NOTOSANS_14_FONT_ID, name, screenW - SIDE_PAD * 2 - 105);
-    renderer.drawText(NOTOSANS_14_FONT_ID, SIDE_PAD + 16, y + 18, shown.c_str());
+    renderer.drawText(NOTOSANS_14_FONT_ID, SIDE_PAD + 16, y + 10, shown.c_str());
 
     if (habit->type == HabitType::Completion) {
       const uint16_t count = habit->period == HabitPeriod::Weekly

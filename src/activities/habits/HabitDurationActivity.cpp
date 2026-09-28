@@ -22,7 +22,6 @@
 
 namespace {
 constexpr int SIDE_PAD = 24;
-constexpr int CONTENT_TOP = 190;
 constexpr int ROW_H = 58;
 
 struct TimerLayout {
@@ -45,13 +44,21 @@ TimerLayout pomodoroLayout(const GfxRenderer& renderer) {
   return {phaseY, digitsY, progressY, barY, barY + (compact ? 18 : 26), compact ? 40 : ROW_H};
 }
 
+TimerLayout durationLayout(const GfxRenderer& renderer) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int digitsY = metrics.topPadding + metrics.headerHeight + (renderer.getScreenHeight() <= 600 ? 14 : 26);
+  const int barY = digitsY + 80;
+  const bool compact = renderer.getScreenHeight() <= 600;
+  return {0, digitsY, 0, barY, barY + (compact ? 18 : 26), compact ? 40 : ROW_H};
+}
+
 void drawLargeMinutes(const GfxRenderer& renderer, const int centerX, const int top, const uint32_t minutes,
                       const char* unit) {
   static constexpr uint8_t DIGITS[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
   char text[8];
   snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(std::min<uint32_t>(minutes, 9999)));
   const int count = static_cast<int>(strlen(text));
-  const int start = centerX - (count * 44 + 44) / 2;
+  const int start = centerX - (count * 44 + 8 + renderer.getTextWidth(NOTOSANS_14_FONT_ID, unit)) / 2;
   for (int i = 0; i < count; ++i) {
     const uint8_t mask = DIGITS[text[i] - '0'];
     const int x = start + i * 44;
@@ -240,7 +247,7 @@ void HabitDurationActivity::loop() {
   int row = -1;
   const HabitDefinition* currentHabit = HABIT_SHEEP.findHabit(habitId);
   const bool pomodoro = currentHabit && currentHabit->type == HabitType::Pomodoro;
-  const TimerLayout layout = pomodoro ? pomodoroLayout(renderer) : TimerLayout{0, 0, 0, 172, CONTENT_TOP, ROW_H};
+  const TimerLayout layout = pomodoro ? pomodoroLayout(renderer) : durationLayout(renderer);
   const auto touch = mappedInput.rowTouch(row, layout.actionsY, layout.rowHeight, labels.count, SIDE_PAD,
                                           renderer.getScreenWidth() - SIDE_PAD, layout.rowHeight);
   if (touch == MappedInputManager::RowTouch::Tap) {
@@ -301,7 +308,7 @@ void HabitDurationActivity::render(RenderLock&&) {
 
   char progressText[40];
   const bool pomodoro = habit->type == HabitType::Pomodoro;
-  const TimerLayout layout = pomodoro ? pomodoroLayout(renderer) : TimerLayout{0, 0, 111, 172, CONTENT_TOP, ROW_H};
+  const TimerLayout layout = pomodoro ? pomodoroLayout(renderer) : durationLayout(renderer);
   if (pomodoro) {
     snprintf(progressText, sizeof(progressText), tr(STR_HABIT_FOCUS_PROGRESS),
              static_cast<unsigned>(progress.pomodoroSessions), static_cast<unsigned>(habit->sessionsPerCycle));
@@ -322,9 +329,9 @@ void HabitDurationActivity::render(RenderLock&&) {
                      phase == HabitTimer::Phase::Focus ? tr(STR_HABIT_MINUTES_ABBR) : tr(STR_HABIT_MINUTES_LEFT));
     renderer.drawCenteredText(NOTOSANS_14_FONT_ID, layout.progressY, progressText);
   } else {
-    snprintf(progressText, sizeof(progressText), "%lu / %u min", static_cast<unsigned long>(minutes),
-             static_cast<unsigned>(habit->targetMinutes));
-    renderer.drawCenteredText(NOTOSANS_18_FONT_ID, layout.progressY, progressText);
+    snprintf(progressText, sizeof(progressText), "/ %u %s", static_cast<unsigned>(habit->targetMinutes),
+             tr(STR_HABIT_MINUTES_ABBR));
+    drawLargeMinutes(renderer, screenW / 2, layout.digitsY, minutes, progressText);
   }
 
   const int barX = SIDE_PAD;

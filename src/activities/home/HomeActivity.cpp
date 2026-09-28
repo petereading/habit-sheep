@@ -389,6 +389,7 @@ void HomeActivity::activateHabitSheepSelection() {
                                    [this, id = habit->id](const int selected) {
                                      if (selected == 1 && HABIT_EVENTS.appendCompletion(id)) {
                                        habitSheepUi->nudgeSheep();
+                                       habitRewardPending = true;
                                        requestUpdate();
                                      }
                                    });
@@ -443,6 +444,12 @@ void HomeActivity::loopHabitSheepHome() {
 
   if (habitReplacementPopup.isActive()) {
     habitReplacementPopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    if (habitRewardPending) {
+      habitRewardPending = false;
+      const char* options[] = {tr(STR_DONE)};
+      habitReplacementPopup.show(tr(STR_HABIT_REWARD_TITLE), tr(STR_HABIT_REWARD_MESSAGE), options, 1, 0, [](int) {});
+      requestUpdate();
+    }
     return;
   }
 
