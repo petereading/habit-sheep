@@ -134,11 +134,12 @@ void ReaderActivity::recordReadingTime(const bool force) {
     if (*readingDay && strcmp(today, readingDay) != 0) {
       const uint32_t seconds = (now - readingLastRecordedMs) / 1000;
       if (seconds > 0) {
-        for (const auto& habit : HABIT_SHEEP.getHabits()) {
-          if (habit.type == HabitType::Duration && habit.readingIntegration &&
-              !HABIT_EVENTS.appendDurationSecondsOnDay(habit.id, seconds, readingDay))
-            return;
-        }
+        const auto& habits = HABIT_SHEEP.getHabits();
+        if (std::any_of(habits.begin(), habits.end(), [&](const auto& habit) {
+              return habit.type == HabitType::Duration && habit.readingIntegration &&
+                     !HABIT_EVENTS.appendDurationSecondsOnDay(habit.id, seconds, readingDay);
+            }))
+          return;
       }
       readingLastRecordedMs = now;
       snprintf(readingDay, sizeof(readingDay), "%s", today);
@@ -150,11 +151,12 @@ void ReaderActivity::recordReadingTime(const bool force) {
   const uint32_t seconds = (now - readingLastRecordedMs) / 1000;
   if (seconds < 60 && !force) return;
   if (seconds == 0) return;
-  for (const auto& habit : HABIT_SHEEP.getHabits()) {
-    if (habit.type == HabitType::Duration && habit.readingIntegration &&
-        !HABIT_EVENTS.appendDurationSeconds(habit.id, seconds, HabitEventSource::Reader))
-      return;
-  }
+  const auto& habits = HABIT_SHEEP.getHabits();
+  if (std::any_of(habits.begin(), habits.end(), [&](const auto& habit) {
+        return habit.type == HabitType::Duration && habit.readingIntegration &&
+               !HABIT_EVENTS.appendDurationSeconds(habit.id, seconds, HabitEventSource::Reader);
+      }))
+    return;
   readingLastRecordedMs += seconds * 1000;
 }
 
