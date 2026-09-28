@@ -34,7 +34,8 @@ void HabitLibraryActivity::rebuildRows() {
   for (const auto& habit : habits) {
     labels.push_back(habit.name);
     if (habit.type == HabitType::Completion) {
-      subtitles.emplace_back("Completion");
+      subtitles.emplace_back(std::to_string(habit.targetCount) + " / " +
+                             (habit.period == HabitPeriod::Weekly ? tr(STR_HABIT_WEEKLY) : tr(STR_HABIT_DAILY)));
     } else if (habit.type == HabitType::Pomodoro) {
       subtitles.emplace_back(std::to_string(habit.targetMinutes) + "/" + std::to_string(habit.shortBreakMinutes) + "/" +
                              std::to_string(habit.longBreakMinutes) + " min");
@@ -78,7 +79,27 @@ void HabitLibraryActivity::chooseNewHabitType() {
     if (pendingType != HabitType::Completion)
       chooseDurationTarget();
     else
-      savePendingHabit(false);
+      chooseCompletionPeriod();
+  });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::chooseCompletionPeriod() {
+  const char* options[] = {tr(STR_HABIT_DAILY), tr(STR_HABIT_WEEKLY)};
+  popup.show(tr(STR_HABIT_PERIOD), options, 2, 0, [this](const int selected) {
+    pendingPeriod = selected == 1 ? HabitPeriod::Weekly : HabitPeriod::Daily;
+    chooseCompletionTarget();
+  });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::chooseCompletionTarget() {
+  const char* options[] = {"1", "2", "3", "5", "8", "10", "12"};
+  popup.show(tr(STR_HABIT_TARGET_COUNT), options, 7, 0, [this](const int selected) {
+    static constexpr uint8_t counts[] = {1, 2, 3, 5, 8, 10, 12};
+    if (selected < 0 || selected >= 7) return;
+    pendingTargetCount = counts[selected];
+    savePendingHabit(false);
   });
   requestUpdate();
 }
@@ -117,6 +138,8 @@ void HabitLibraryActivity::savePendingHabit(const bool readingIntegration) {
   habit.type = pendingType;
   habit.targetMinutes = pendingType == HabitType::Completion ? 0 : pendingTargetMinutes;
   habit.readingIntegration = pendingType == HabitType::Duration && readingIntegration;
+  habit.period = pendingPeriod;
+  habit.targetCount = pendingTargetCount;
 
   if (HABIT_SHEEP.upsertHabit(habit)) {
     // Fill the first empty active slot. Users can immediately use the habit,
@@ -172,6 +195,41 @@ void HabitLibraryActivity::changeTarget(const std::string& habitId) {
                rebuildRows();
                requestUpdate();
              });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::changeCompletionPeriod(const std::string& habitId) {
+  const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
+  if (!found || found->type != HabitType::Completion) return;
+  HabitDefinition updated = *found;
+  const char* options[] = {tr(STR_HABIT_DAILY), tr(STR_HABIT_WEEKLY)};
+  popup.show(tr(STR_HABIT_PERIOD), options, 2, updated.period == HabitPeriod::Weekly ? 1 : 0,
+             [this, updated](const int selected) mutable {
+               updated.period = selected == 1 ? HabitPeriod::Weekly : HabitPeriod::Daily;
+               HABIT_SHEEP.upsertHabit(updated);
+               rebuildRows();
+               requestUpdate();
+             });
+  requestUpdate();
+}
+
+void HabitLibraryActivity::changeCompletionTarget(const std::string& habitId) {
+  const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
+  if (!found || found->type != HabitType::Completion) return;
+  HabitDefinition updated = *found;
+  static constexpr uint8_t counts[] = {1, 2, 3, 5, 8, 10, 12};
+  const char* options[] = {"1", "2", "3", "5", "8", "10", "12"};
+  int current = 0;
+  for (int i = 0; i < 7; ++i) {
+    if (counts[i] == updated.targetCount) current = i;
+  }
+  popup.show(tr(STR_HABIT_TARGET_COUNT), options, 7, current, [this, updated](const int selected) mutable {
+    if (selected < 0 || selected >= 7) return;
+    updated.targetCount = counts[selected];
+    HABIT_SHEEP.upsertHabit(updated);
+    rebuildRows();
+    requestUpdate();
+  });
   requestUpdate();
 }
 
@@ -263,7 +321,7 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         confirmDelete(habitId);
     });
   } else if (habit->type == HabitType::Duration) {
-    const char* OPTIONS[] = {"Rename", "Change target", "Toggle reading shortcuts", "Delete"};
+    const char* OPTIONS[] = {"Rename", "Change target", tr(STR_HABIT_AUTO_READING), "Delete"};
     popup.show(habit->name.c_str(), OPTIONS, 4, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
@@ -275,11 +333,15 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         confirmDelete(habitId);
     });
   } else {
-    static const char* OPTIONS[] = {"Rename", "Delete"};
-    popup.show(habit->name.c_str(), OPTIONS, 2, 0, [this, habitId](const int index) {
+    const char* OPTIONS[] = {"Rename", tr(STR_HABIT_PERIOD), tr(STR_HABIT_TARGET_COUNT), "Delete"};
+    popup.show(habit->name.c_str(), OPTIONS, 4, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
+        changeCompletionPeriod(habitId);
+      else if (index == 2)
+        changeCompletionTarget(habitId);
+      else if (index == 3)
         confirmDelete(habitId);
     });
   }

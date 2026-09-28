@@ -11,6 +11,7 @@
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
+#include "I18n.h"
 #include "MappedInputManager.h"
 #include "SheepStateStore.h"
 #include "components/UITheme.h"
@@ -175,12 +176,15 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top
     renderer.drawText(NOTOSANS_14_FONT_ID, SIDE_PAD + 16, y + 18, shown.c_str());
 
     if (habit->type == HabitType::Completion) {
-      const auto progress = HABIT_EVENTS.progressForToday(habit->id);
-      renderer.drawRoundedRect(screenW - SIDE_PAD - 42, y + 15, 22, 22, 2, 4, true);
-      if (progress.completed) {
-        renderer.drawLine(screenW - SIDE_PAD - 37, y + 27, screenW - SIDE_PAD - 31, y + 33, 2, true);
-        renderer.drawLine(screenW - SIDE_PAD - 31, y + 33, screenW - SIDE_PAD - 22, y + 20, 2, true);
-      }
+      const uint16_t count = habit->period == HabitPeriod::Weekly
+                                 ? HABIT_EVENTS.completionCountForWeek(habit->id)
+                                 : HABIT_EVENTS.progressForToday(habit->id).completionCount;
+      char value[24];
+      snprintf(value, sizeof(value), "%u/%u %s", static_cast<unsigned>(count),
+               static_cast<unsigned>(habit->targetCount),
+               habit->period == HabitPeriod::Weekly ? tr(STR_HABIT_WEEK_ABBR) : tr(STR_HABIT_DAY_ABBR));
+      const int valueW = renderer.getTextWidth(SMALL_FONT_ID, value);
+      renderer.drawText(SMALL_FONT_ID, screenW - SIDE_PAD - 16 - valueW, y + 22, value);
     } else {
       auto progress = HABIT_EVENTS.progressForToday(habit->id);
       if (HABIT_TIMER.isForHabit(habit->id) && HABIT_TIMER.phaseFor(habit->id) == HabitTimer::Phase::Focus)
@@ -302,7 +306,11 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
     const auto progress = HABIT_EVENTS.progressForToday(habit->id);
     char value[24];
     if (habit->type == HabitType::Completion) {
-      snprintf(value, sizeof(value), "%s", progress.completed ? "Done" : "—");
+      const uint16_t count = habit->period == HabitPeriod::Weekly ? HABIT_EVENTS.completionCountForWeek(habit->id)
+                                                                  : progress.completionCount;
+      snprintf(value, sizeof(value), "%u/%u %s", static_cast<unsigned>(count),
+               static_cast<unsigned>(habit->targetCount),
+               habit->period == HabitPeriod::Weekly ? tr(STR_HABIT_WEEK_ABBR) : tr(STR_HABIT_DAY_ABBR));
     } else if (habit->type == HabitType::Pomodoro) {
       snprintf(value, sizeof(value), "%u/%u focus", static_cast<unsigned>(progress.pomodoroSessions),
                static_cast<unsigned>(habit->sessionsPerCycle));

@@ -89,13 +89,9 @@ bool HabitTimer::start(const std::string& id) {
 bool HabitTimer::pause(const std::string& id) {
   Session* session = find(id);
   if (!session || !session->running) return false;
-  const uint32_t before = session->accumulatedMs;
   session->accumulatedMs = elapsedMs(*session);
   session->running = false;
-  if (saveToFile()) return true;
-  session->accumulatedMs = before;
-  session->running = true;
-  return false;
+  return saveToFile();
 }
 
 bool HabitTimer::resume(const std::string& id) {
@@ -143,7 +139,7 @@ void HabitTimer::tick() {
       const auto progress = HABIT_EVENTS.progressForToday(session.habitId);
       session.phase = progress.pomodoroSessions % habit->sessionsPerCycle == 0 ? Phase::LongBreak : Phase::ShortBreak;
       session.accumulatedMs = 0;
-      session.startedAtMs = millis();
+      session.running = false;
       saveToFile();
     } else {
       // A completed break waits for an explicit start of the next focus session.
@@ -186,13 +182,21 @@ bool HabitTimer::fromJson(JsonVariantConst doc) {
     const int phase = item["phase"] | 0;
     session.phase = phase >= 0 && phase <= 2 ? static_cast<Phase>(phase) : Phase::Focus;
     const int64_t saved = item["savedEpoch"] | static_cast<int64_t>(0);
-    const bool wasRunning = item["running"] | false;
-    if (wasRunning && !isRunning() && saved > 0 && now >= saved) {
-      const int64_t delta = std::min<int64_t>(now - saved, 86400);
-      session.accumulatedMs += static_cast<uint32_t>(delta * 1000);
-      session.startedAtMs = millis();
-      session.running = true;
+    if (saved > 0 && now > 0) {
+      time_t savedTime = static_cast<time_t>(saved);
+      time_t currentTime = static_cast<time_t>(now);
+      struct tm savedLocal{};
+      struct tm currentLocal{};
+      localtime_r(&savedTime, &savedLocal);
+      localtime_r(&currentTime, &currentLocal);
+      if (savedLocal.tm_year != currentLocal.tm_year || savedLocal.tm_yday != currentLocal.tm_yday) {
+        clear(session);
+        --index;
+        continue;
+      }
     }
+    // An interrupted activity or deep sleep never advances a habit timer.
+    // The persisted elapsed value can be resumed explicitly by the user.
   }
   return true;
 }

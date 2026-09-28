@@ -1375,9 +1375,12 @@ void CrossPointWebServer::handlePostHabitSheep() {
     const int shortBreak = doc["shortBreakMinutes"] | 5;
     const int longBreak = doc["longBreakMinutes"] | 15;
     const int sessions = doc["sessionsPerCycle"] | 4;
+    const int targetCount = doc["targetCount"] | 1;
+    const char* period = doc["period"] | "daily";
     const char* requestedId = doc["id"] | "";
     if (*name && strlen(name) <= HabitSheepStore::MAX_NAME_BYTES && (duration || pomodoro || completion) &&
-        (completion || (minutes > 0 && minutes <= 1440)) &&
+        (completion || (minutes > 0 && minutes <= 1440)) && targetCount > 0 && targetCount <= 99 &&
+        (strcmp(period, "daily") == 0 || strcmp(period, "weekly") == 0) &&
         (!pomodoro || (shortBreak > 0 && shortBreak <= 120 && longBreak > 0 && longBreak <= 120 && sessions > 0 &&
                        sessions <= 12)) &&
         (!*requestedId || HABIT_SHEEP.findHabit(requestedId))) {
@@ -1397,6 +1400,8 @@ void CrossPointWebServer::handlePostHabitSheep() {
       habit.shortBreakMinutes = static_cast<uint16_t>(shortBreak);
       habit.longBreakMinutes = static_cast<uint16_t>(longBreak);
       habit.sessionsPerCycle = static_cast<uint8_t>(sessions);
+      habit.period = strcmp(period, "weekly") == 0 ? HabitPeriod::Weekly : HabitPeriod::Daily;
+      habit.targetCount = static_cast<uint8_t>(targetCount);
       valid = HABIT_SHEEP.upsertHabit(habit);
     }
   } else if (strcmp(action, "deleteHabit") == 0) {

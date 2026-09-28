@@ -2,14 +2,20 @@
 
 #include <FontCacheManager.h>
 #include <FsHelpers.h>
+#include <HalClock.h>
 #include <HalStorage.h>
 #include <Memory.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <ctime>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderActivity.h"
+#include "HabitEventLog.h"
+#include "HabitSheepStore.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
@@ -74,6 +80,17 @@ void ReaderActivity::onEnter() {
     return;
   }
 
+  readingTimeTracked = std::any_of(
+      HABIT_SHEEP.getHabits().begin(), HABIT_SHEEP.getHabits().end(),
+      [](const HabitDefinition& habit) { return habit.type == HabitType::Duration && habit.readingIntegration; });
+  if (readingTimeTracked) {
+    readingLastRecordedMs = millis();
+    readingLastCheckMs = readingLastRecordedMs;
+    struct tm local{};
+    if (halClock.isAvailable() && halClock.localTime(local))
+      strftime(readingDay, sizeof(readingDay), "%Y-%m-%d", &local);
+  }
+
   requestUpdate();
 }
 
@@ -86,6 +103,7 @@ void ReaderActivity::rememberBookOnceRendered() {
 }
 
 void ReaderActivity::onExit() {
+  recordReadingTime(true);
   Activity::onExit();
 
   // Keep rebuildable font buffers from pinning the heap between reading sessions.
@@ -101,6 +119,43 @@ void ReaderActivity::onExit() {
 
   endOfBookOptions.reset();
   endOfBookOptionsReady.store(false, std::memory_order_release);
+}
+
+void ReaderActivity::recordReadingTime(const bool force) {
+  if (!readingTimeTracked) return;
+  const unsigned long now = millis();
+  if (!force && now - readingLastCheckMs < 1000) return;
+  readingLastCheckMs = now;
+
+  struct tm local{};
+  if (halClock.isAvailable() && halClock.localTime(local)) {
+    char today[sizeof(readingDay)];
+    strftime(today, sizeof(today), "%Y-%m-%d", &local);
+    if (*readingDay && strcmp(today, readingDay) != 0) {
+      const uint32_t seconds = (now - readingLastRecordedMs) / 1000;
+      if (seconds > 0) {
+        for (const auto& habit : HABIT_SHEEP.getHabits()) {
+          if (habit.type == HabitType::Duration && habit.readingIntegration &&
+              !HABIT_EVENTS.appendDurationSecondsOnDay(habit.id, seconds, readingDay))
+            return;
+        }
+      }
+      readingLastRecordedMs = now;
+      snprintf(readingDay, sizeof(readingDay), "%s", today);
+    } else if (!*readingDay) {
+      snprintf(readingDay, sizeof(readingDay), "%s", today);
+    }
+  }
+
+  const uint32_t seconds = (now - readingLastRecordedMs) / 1000;
+  if (seconds < 60 && !force) return;
+  if (seconds == 0) return;
+  for (const auto& habit : HABIT_SHEEP.getHabits()) {
+    if (habit.type == HabitType::Duration && habit.readingIntegration &&
+        !HABIT_EVENTS.appendDurationSeconds(habit.id, seconds, HabitEventSource::Reader))
+      return;
+  }
+  readingLastRecordedMs += seconds * 1000;
 }
 
 bool ReaderActivity::handleBackNavigation() {
@@ -163,6 +218,7 @@ bool ReaderActivity::handleEndOfBookPageTurn(const bool prevTriggered, const boo
 }
 
 void ReaderActivity::loop() {
+  recordReadingTime();
   rememberBookOnceRendered();
   clearEndOfBookOptionsIfNeeded();
   if (handleEndOfBookMenu()) return;

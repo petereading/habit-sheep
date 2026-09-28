@@ -23,6 +23,8 @@ class HabitLibraryActivity final : public UiListActivity {
   std::string pendingName;
   HabitType pendingType = HabitType::Completion;
   uint16_t pendingTargetMinutes = 0;
+  HabitPeriod pendingPeriod = HabitPeriod::Daily;
+  uint8_t pendingTargetCount = 1;
 
   int listCount() const override { return static_cast<int>(rows.size()); }
   const char* headerTitle() const override { return "Habit library"; }
@@ -34,11 +36,15 @@ class HabitLibraryActivity final : public UiListActivity {
   void startAddHabit();
   void chooseNewHabitType();
   void chooseDurationTarget();
+  void chooseCompletionPeriod();
+  void chooseCompletionTarget();
   void chooseReadingIntegration();
   void savePendingHabit(bool readingIntegration);
   void showEditMenu(const std::string& habitId);
   void renameHabit(const std::string& habitId);
   void changeTarget(const std::string& habitId);
+  void changeCompletionPeriod(const std::string& habitId);
+  void changeCompletionTarget(const std::string& habitId);
   void changePomodoroBreak(const std::string& habitId, bool longBreak);
   void changePomodoroSessions(const std::string& habitId);
   void toggleReadingIntegration(const std::string& habitId);

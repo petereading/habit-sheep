@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <utility>
 
 #include "HabitEventLog.h"
@@ -14,6 +16,7 @@
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "activities/ActivityManager.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -21,6 +24,27 @@ namespace {
 constexpr int SIDE_PAD = 24;
 constexpr int CONTENT_TOP = 190;
 constexpr int ROW_H = 58;
+
+void drawLargeMinutes(const GfxRenderer& renderer, const int centerX, const int top, const uint32_t minutes,
+                      const char* unit) {
+  static constexpr uint8_t DIGITS[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
+  char text[8];
+  snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(std::min<uint32_t>(minutes, 9999)));
+  const int count = static_cast<int>(strlen(text));
+  const int start = centerX - (count * 44 + 44) / 2;
+  for (int i = 0; i < count; ++i) {
+    const uint8_t mask = DIGITS[text[i] - '0'];
+    const int x = start + i * 44;
+    if (mask & 0x01) renderer.fillRect(x + 6, top, 30, 6);
+    if (mask & 0x02) renderer.fillRect(x + 36, top + 5, 6, 23);
+    if (mask & 0x04) renderer.fillRect(x + 36, top + 30, 6, 23);
+    if (mask & 0x08) renderer.fillRect(x + 6, top + 52, 30, 6);
+    if (mask & 0x10) renderer.fillRect(x, top + 30, 6, 23);
+    if (mask & 0x20) renderer.fillRect(x, top + 5, 6, 23);
+    if (mask & 0x40) renderer.fillRect(x + 6, top + 26, 30, 6);
+  }
+  renderer.drawText(NOTOSANS_14_FONT_ID, start + count * 44 + 8, top + 30, unit);
+}
 }  // namespace
 
 HabitDurationActivity::HabitDurationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -34,42 +58,82 @@ void HabitDurationActivity::onEnter() {
   requestUpdate();
 }
 
+void HabitDurationActivity::onExit() {
+  const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
+  if (HABIT_TIMER.isForHabit(habitId)) {
+    if (habit && habit->type == HabitType::Pomodoro) {
+      if (HABIT_TIMER.isRunningFor(habitId)) HABIT_TIMER.pause(habitId);
+    } else {
+      HABIT_TIMER.stopAndLog(habitId);
+      if (HABIT_TIMER.isRunningFor(habitId)) HABIT_TIMER.pause(habitId);
+    }
+  }
+  Activity::onExit();
+}
+
 HabitDurationActivity::ActionLabels HabitDurationActivity::actionLabels() const {
   ActionLabels labels;
+  const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
+  const bool pomodoro = habit && habit->type == HabitType::Pomodoro;
+  const auto phase = HABIT_TIMER.phaseFor(habitId);
   if (HABIT_TIMER.isForHabit(habitId)) {
     if (HABIT_TIMER.isRunningFor(habitId))
-      labels.items[labels.count++] = "Pause timer";
+      labels.items[labels.count++] = pomodoro ? tr(STR_HABIT_PAUSE_SESSION) : tr(STR_HABIT_PAUSE_TIMER);
     else if (HABIT_TIMER.hasOtherRunning(habitId))
       labels.items[labels.count++] = tr(STR_HABIT_PAUSE_OTHER);
+    else if (pomodoro && phase != HabitTimer::Phase::Focus && HABIT_TIMER.elapsedSecondsFor(habitId) == 0)
+      labels.items[labels.count++] = tr(STR_HABIT_START_BREAK);
+    else if (pomodoro && phase == HabitTimer::Phase::Focus && HABIT_TIMER.elapsedSecondsFor(habitId) == 0)
+      labels.items[labels.count++] = tr(STR_HABIT_START_FOCUS);
     else
-      labels.items[labels.count++] = "Resume timer";
-    labels.items[labels.count++] = "Stop & log";
+      labels.items[labels.count++] = tr(STR_HABIT_RESUME_TIMER);
+    labels.items[labels.count++] = pomodoro ? tr(STR_HABIT_END_SESSION) : tr(STR_HABIT_STOP_LOG);
   } else if (HABIT_TIMER.isRunning()) {
     labels.items[labels.count++] = tr(STR_HABIT_PAUSE_OTHER);
   } else {
-    labels.items[labels.count++] = "Start timer";
+    labels.items[labels.count++] = pomodoro ? tr(STR_HABIT_START_FOCUS) : tr(STR_HABIT_START_TIMER);
   }
-  labels.items[labels.count++] = "+ Add minutes";
+  labels.items[labels.count++] = tr(STR_HABIT_ADD_MINUTES);
 
-  const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   if (habit && habit->readingIntegration) {
-    labels.items[labels.count++] = "Continue reading";
-    labels.items[labels.count++] = "Browse files";
+    labels.items[labels.count++] = tr(STR_HABIT_CONTINUE_READING);
+    labels.items[labels.count++] = tr(STR_HABIT_BROWSE_FILES);
   }
   return labels;
 }
 
 void HabitDurationActivity::showAddMinutes() {
   static const char* OPTIONS[] = {"+5 minutes",  "+10 minutes", "+15 minutes", "+20 minutes",
-                                  "+30 minutes", "+45 minutes", "+60 minutes"};
-  addMinutesPopup.show("Add time", OPTIONS, 7, 2, [this](const int selected) {
+                                  "+30 minutes", "+45 minutes", "+60 minutes", "Custom minutes"};
+  addMinutesPopup.show(tr(STR_HABIT_ADD_MINUTES), OPTIONS, 8, 2, [this](const int selected) {
     static constexpr uint16_t MINUTES[] = {5, 10, 15, 20, 30, 45, 60};
+    if (selected == 7) {
+      showCustomMinutes();
+      return;
+    }
     if (selected < 0 || selected >= 7) return;
     HABIT_EVENTS.appendDurationSeconds(habitId, static_cast<uint32_t>(MINUTES[selected]) * 60,
                                        HabitEventSource::Manual);
     requestUpdate();
   });
   requestUpdate();
+}
+
+void HabitDurationActivity::showCustomMinutes() {
+  if (HABIT_TIMER.isRunningFor(habitId)) HABIT_TIMER.pause(habitId);
+  auto editor = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_HABIT_ADD_MINUTES), "", 4,
+                                                         InputType::Text);
+  if (!editor) return;
+  startActivityForResult(std::move(editor), [this](const ActivityResult& result) {
+    if (result.isCancelled) return;
+    const auto& value = std::get<KeyboardResult>(result.data).text;
+    if (value.empty()) return;
+    char* end = nullptr;
+    const unsigned long minutes = strtoul(value.c_str(), &end, 10);
+    if (*end != '\0' || minutes == 0 || minutes > 1440) return;
+    HABIT_EVENTS.appendDurationSeconds(habitId, static_cast<uint32_t>(minutes) * 60, HabitEventSource::Manual);
+    requestUpdate();
+  });
 }
 
 void HabitDurationActivity::continueReading() {
@@ -167,10 +231,26 @@ void HabitDurationActivity::loop() {
     return;
   }
 
-  if (HABIT_TIMER.isRunningFor(habitId)) {
-    const int minute = static_cast<int>(HABIT_TIMER.elapsedSecondsFor(habitId) / 60);
-    if (minute != lastRenderedMinute) {
+  if (HABIT_TIMER.isForHabit(habitId)) {
+    const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
+    const auto phase = HABIT_TIMER.phaseFor(habitId);
+    const bool running = HABIT_TIMER.isRunningFor(habitId);
+    const uint32_t elapsed = HABIT_TIMER.elapsedSecondsFor(habitId);
+    const uint32_t target =
+        habit && habit->type == HabitType::Pomodoro
+            ? static_cast<uint32_t>(phase == HabitTimer::Phase::Focus        ? habit->targetMinutes
+                                    : phase == HabitTimer::Phase::ShortBreak ? habit->shortBreakMinutes
+                                                                             : habit->longBreakMinutes) *
+                  60
+            : 0;
+    const int minute = static_cast<int>(target > 0 && phase != HabitTimer::Phase::Focus
+                                            ? (target > elapsed ? (target - elapsed + 59) / 60 : 0)
+                                            : elapsed / 60);
+    if (minute != lastRenderedMinute || static_cast<int>(phase) != lastRenderedPhase ||
+        running != lastRenderedRunning) {
       lastRenderedMinute = minute;
+      lastRenderedPhase = static_cast<int>(phase);
+      lastRenderedRunning = running;
       requestUpdate();
     }
   }
@@ -197,27 +277,29 @@ void HabitDurationActivity::render(RenderLock&&) {
   const uint32_t minutes = progress.durationSeconds / 60;
 
   char progressText[40];
-  if (habit->type == HabitType::Pomodoro)
+  if (habit->type == HabitType::Pomodoro) {
     snprintf(progressText, sizeof(progressText), tr(STR_HABIT_FOCUS_PROGRESS),
              static_cast<unsigned>(progress.pomodoroSessions), static_cast<unsigned>(habit->sessionsPerCycle));
-  else
+    const auto phase = HABIT_TIMER.phaseFor(habitId);
+    const char* phaseLabel = phase == HabitTimer::Phase::Focus        ? tr(STR_HABIT_FOCUS)
+                             : phase == HabitTimer::Phase::ShortBreak ? tr(STR_HABIT_SHORT_BREAK)
+                                                                      : tr(STR_HABIT_LONG_BREAK);
+    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 72, phaseLabel);
+    const uint32_t elapsed = HABIT_TIMER.elapsedSecondsFor(habitId);
+    const uint32_t target = static_cast<uint32_t>(phase == HabitTimer::Phase::Focus        ? habit->targetMinutes
+                                                  : phase == HabitTimer::Phase::ShortBreak ? habit->shortBreakMinutes
+                                                                                           : habit->longBreakMinutes) *
+                            60;
+    const uint32_t shown = phase == HabitTimer::Phase::Focus ? elapsed / 60
+                           : target > elapsed                ? (target - elapsed + 59) / 60
+                                                             : 0;
+    drawLargeMinutes(renderer, screenW / 2, 83, shown,
+                     phase == HabitTimer::Phase::Focus ? tr(STR_HABIT_MINUTES_ABBR) : tr(STR_HABIT_MINUTES_LEFT));
+    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 153, progressText);
+  } else {
     snprintf(progressText, sizeof(progressText), "%lu / %u min", static_cast<unsigned long>(minutes),
              static_cast<unsigned>(habit->targetMinutes));
-  renderer.drawCenteredText(NOTOSANS_18_FONT_ID, 111, progressText);
-
-  if (habit->type == HabitType::Pomodoro && HABIT_TIMER.isForHabit(habitId)) {
-    const auto phase = HABIT_TIMER.phaseFor(habitId);
-    const char* label = phase == HabitTimer::Phase::Focus        ? tr(STR_HABIT_FOCUS)
-                        : phase == HabitTimer::Phase::ShortBreak ? tr(STR_HABIT_SHORT_BREAK)
-                                                                 : tr(STR_HABIT_LONG_BREAK);
-    const uint16_t target = phase == HabitTimer::Phase::Focus        ? habit->targetMinutes
-                            : phase == HabitTimer::Phase::ShortBreak ? habit->shortBreakMinutes
-                                                                     : habit->longBreakMinutes;
-    const uint32_t elapsed = HABIT_TIMER.elapsedSecondsFor(habitId);
-    char phaseText[40];
-    snprintf(phaseText, sizeof(phaseText), tr(STR_HABIT_PHASE_PROGRESS), label,
-             static_cast<unsigned long>(elapsed / 60), static_cast<unsigned>(target));
-    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 145, phaseText);
+    renderer.drawCenteredText(NOTOSANS_18_FONT_ID, 111, progressText);
   }
 
   const int barX = SIDE_PAD;

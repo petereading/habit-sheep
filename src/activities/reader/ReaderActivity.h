@@ -18,8 +18,13 @@ class ReaderActivity : public Activity {
   std::atomic<bool> endOfBookOptionsReady{false};
   std::atomic<bool> pageRendered{false};
   bool bookRemembered = false;
+  bool readingTimeTracked = false;
+  unsigned long readingLastRecordedMs = 0;
+  unsigned long readingLastCheckMs = 0;
+  char readingDay[11]{};
   void markPageRendered() { pageRendered.store(true, std::memory_order_release); }
   void rememberBookOnceRendered();
+  void recordReadingTime(bool force = false);
 
   explicit ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                           std::string bookPath, bool allowFastInitialRefresh);

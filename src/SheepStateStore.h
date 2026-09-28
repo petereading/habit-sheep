@@ -26,6 +26,7 @@ class SheepStateStore : public PersistableStore<SheepStateStore> {
 
   uint32_t bondPoints = 0;
   uint32_t pasturePoints = 0;
+  uint16_t durationRemainderSeconds = 0;
 };
 
 #define SHEEP_STATE SheepStateStore::getInstance()

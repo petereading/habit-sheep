@@ -8,7 +8,7 @@
 #include <utility>
 
 namespace {
-constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 3;
+constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 4;
 
 const char* habitTypeName(const HabitType type) {
   if (type == HabitType::Pomodoro) return "pomodoro";
@@ -58,6 +58,8 @@ void HabitSheepStore::toJson(JsonDocument& doc) const {
     obj["shortBreakMinutes"] = habit.shortBreakMinutes;
     obj["longBreakMinutes"] = habit.longBreakMinutes;
     obj["sessionsPerCycle"] = habit.sessionsPerCycle;
+    obj["period"] = habit.period == HabitPeriod::Weekly ? "weekly" : "daily";
+    obj["targetCount"] = habit.targetCount;
   }
 
   JsonArray activeArray = doc["activeHabitIds"].to<JsonArray>();
@@ -96,6 +98,9 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
     habit.shortBreakMinutes = obj["shortBreakMinutes"] | static_cast<uint16_t>(5);
     habit.longBreakMinutes = obj["longBreakMinutes"] | static_cast<uint16_t>(15);
     habit.sessionsPerCycle = obj["sessionsPerCycle"] | static_cast<uint8_t>(4);
+    habit.period = std::string_view(obj["period"] | "daily") == "weekly" ? HabitPeriod::Weekly : HabitPeriod::Daily;
+    habit.targetCount = obj["targetCount"] | static_cast<uint8_t>(1);
+    if (habit.targetCount == 0 || habit.targetCount > 99) habit.targetCount = 1;
     if (habit.type != HabitType::Completion && habit.targetMinutes == 0) continue;
     if (habit.type == HabitType::Pomodoro &&
         (habit.shortBreakMinutes == 0 || habit.longBreakMinutes == 0 || habit.sessionsPerCycle == 0))
@@ -141,6 +146,7 @@ bool HabitSheepStore::setSheepName(const std::string& name) {
 
 bool HabitSheepStore::upsertHabit(const HabitDefinition& habit) {
   if (!validId(habit.id) || !validName(habit.name)) return false;
+  if (habit.targetCount == 0 || habit.targetCount > 99) return false;
   if (habit.type != HabitType::Completion && habit.targetMinutes == 0) return false;
   if (habit.type == HabitType::Pomodoro &&
       (habit.shortBreakMinutes == 0 || habit.longBreakMinutes == 0 || habit.sessionsPerCycle == 0))

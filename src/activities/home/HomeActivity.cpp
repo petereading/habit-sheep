@@ -14,6 +14,7 @@
 #include <Xtc.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -376,10 +377,22 @@ void HomeActivity::activateHabitSheepSelection() {
       if (!habit) break;
 
       if (habit->type == HabitType::Completion) {
-        if (HABIT_EVENTS.appendCompletion(habit->id)) {
-          habitSheepUi->nudgeSheep();
-          requestUpdate();
-        }
+        const uint16_t count = habit->period == HabitPeriod::Weekly
+                                   ? HABIT_EVENTS.completionCountForWeek(habit->id)
+                                   : HABIT_EVENTS.progressForToday(habit->id).completionCount;
+        char headline[128];
+        snprintf(headline, sizeof(headline), tr(STR_HABIT_CONFIRM_PROGRESS), habit->name.c_str(),
+                 static_cast<unsigned>(count), static_cast<unsigned>(habit->targetCount),
+                 habit->period == HabitPeriod::Weekly ? tr(STR_HABIT_WEEKLY) : tr(STR_HABIT_DAILY));
+        const char* options[] = {tr(STR_CANCEL), tr(STR_HABIT_LOG_ONE)};
+        habitReplacementPopup.show(tr(STR_HABIT_CONFIRM_DONE), headline, options, 2, 0,
+                                   [this, id = habit->id](const int selected) {
+                                     if (selected == 1 && HABIT_EVENTS.appendCompletion(id)) {
+                                       habitSheepUi->nudgeSheep();
+                                       requestUpdate();
+                                     }
+                                   });
+        requestUpdate();
       } else {
         auto detail = makeUniqueNoThrow<HabitDurationActivity>(renderer, mappedInput, habit->id);
         if (detail) activityManager.pushActivity(std::move(detail));

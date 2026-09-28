@@ -12,6 +12,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "HabitSheepStore.h"
 #include "SheepStateStore.h"
 
 namespace {
@@ -69,6 +70,9 @@ bool HabitEventLog::refreshToday() {
   currentDay(day, ignoredEpoch);
   cachedDay = day;
   cachedProgress.clear();
+  cachedWeekCounts.clear();
+  cachedProgress.reserve(HabitSheepStore::MAX_HABITS);
+  cachedWeekCounts.reserve(HabitSheepStore::MAX_HABITS);
 
   const std::string path = pathForDay(day);
   if (!Storage.exists(path.c_str())) return true;
@@ -98,6 +102,7 @@ bool HabitEventLog::refreshToday() {
           auto& progress = progressEntry(habitId).progress;
           if (strcmp(type, "completion") == 0) {
             progress.completed = true;
+            ++progress.completionCount;
           } else if (strcmp(type, "duration") == 0) {
             progress.durationSeconds += amount;
           } else if (strcmp(type, "pomodoro") == 0) {
@@ -133,14 +138,74 @@ HabitDailyProgress HabitEventLog::progressForToday(const std::string& habitId) {
   return it == cachedProgress.end() ? HabitDailyProgress{} : it->progress;
 }
 
+uint16_t HabitEventLog::completionCountForDay(const std::string& habitId, const std::string& day) const {
+  const std::string path = pathForDay(day);
+  if (!Storage.exists(path.c_str())) return 0;
+  HalFile file;
+  if (!Storage.openFileForRead("HABIT", path, file)) return 0;
+  uint16_t count = 0;
+  char line[MAX_EVENT_LINE];
+  size_t used = 0;
+  while (file.available()) {
+    const int raw = file.read();
+    if (raw < 0) break;
+    const char ch = static_cast<char>(raw);
+    if (ch != '\n' && used + 1 < sizeof(line)) {
+      line[used++] = ch;
+      continue;
+    }
+    if (ch == '\n' && used > 0) {
+      line[used] = '\0';
+      JsonDocument doc;
+      if (!deserializeJson(doc, line) && habitId == (doc["habit_id"] | "") &&
+          strcmp(doc["type"] | "", "completion") == 0)
+        ++count;
+    }
+    used = 0;
+    if (ch != '\n') {
+      while (file.available()) {
+        const int skip = file.read();
+        if (skip < 0 || static_cast<char>(skip) == '\n') break;
+      }
+    }
+  }
+  return count;
+}
+
+uint16_t HabitEventLog::completionCountForWeek(const std::string& habitId) {
+  std::string day;
+  int64_t ignoredEpoch = 0;
+  if (!currentDay(day, ignoredEpoch)) return progressForToday(habitId).completionCount;
+  if (day != cachedDay) refreshToday();
+  const auto cached = std::find_if(cachedWeekCounts.begin(), cachedWeekCounts.end(),
+                                   [&](const CachedWeekCount& item) { return item.habitId == habitId; });
+  if (cached != cachedWeekCounts.end()) return cached->count;
+
+  struct tm local{};
+  if (!halClock.localTime(local)) return progressForToday(habitId).completionCount;
+  const int daysSinceMonday = (local.tm_wday + 6) % 7;
+  uint16_t count = progressForToday(habitId).completionCount;
+  for (int offset = 1; offset <= daysSinceMonday; ++offset) {
+    struct tm previous = local;
+    previous.tm_mday -= offset;
+    mktime(&previous);
+    char previousDay[16];
+    strftime(previousDay, sizeof(previousDay), "%Y-%m-%d", &previous);
+    count += completionCountForDay(habitId, previousDay);
+  }
+  cachedWeekCounts.push_back({habitId, count});
+  return count;
+}
+
 bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, const uint32_t amount, const char* unit,
-                                const HabitEventSource source) {
+                                const HabitEventSource source, const char* dayOverride) {
   if (habitId.empty() || !type || !unit) return false;
 
-  std::string day;
+  std::string today;
   int64_t epoch = 0;
-  currentDay(day, epoch);
-  if (day != cachedDay) refreshToday();
+  currentDay(today, epoch);
+  if (today != cachedDay) refreshToday();
+  const std::string day = dayOverride && *dayOverride ? dayOverride : today;
 
   if (!Storage.ensureDirectoryExists(EVENT_DIR)) {
     LOG_ERR("HABIT", "Cannot create habit event directory");
@@ -175,24 +240,35 @@ bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, co
   file.close();
   if (written == 0) return false;
 
-  auto& progress = progressEntry(habitId).progress;
+  HabitDailyProgress* progress = day == today ? &progressEntry(habitId).progress : nullptr;
   if (strcmp(type, "completion") == 0) {
-    progress.completed = true;
+    if (progress) {
+      progress->completed = true;
+      ++progress->completionCount;
+      for (auto& cached : cachedWeekCounts) {
+        if (cached.habitId == habitId) ++cached.count;
+      }
+    }
     SHEEP_STATE.recordCompletion();
   } else if (strcmp(type, "duration") == 0) {
-    progress.durationSeconds += amount;
+    if (progress) progress->durationSeconds += amount;
     SHEEP_STATE.recordDuration(amount);
   } else if (strcmp(type, "pomodoro") == 0) {
-    progress.durationSeconds += amount;
-    ++progress.pomodoroSessions;
+    if (progress) {
+      progress->durationSeconds += amount;
+      ++progress->pomodoroSessions;
+    }
     SHEEP_STATE.recordDuration(amount);
   }
   return true;
 }
 
 bool HabitEventLog::appendCompletion(const std::string& habitId, const HabitEventSource source) {
-  const auto current = progressForToday(habitId);
-  if (current.completed) return true;
+  const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
+  if (!habit || habit->type != HabitType::Completion) return false;
+  const uint16_t count = habit->period == HabitPeriod::Weekly ? completionCountForWeek(habitId)
+                                                              : progressForToday(habitId).completionCount;
+  if (count >= habit->targetCount) return false;
   return appendEvent(habitId, "completion", 1, "completion", source);
 }
 
@@ -200,6 +276,12 @@ bool HabitEventLog::appendDurationSeconds(const std::string& habitId, const uint
                                           const HabitEventSource source) {
   if (seconds == 0) return false;
   return appendEvent(habitId, "duration", seconds, "seconds", source);
+}
+
+bool HabitEventLog::appendDurationSecondsOnDay(const std::string& habitId, const uint32_t seconds, const char* day,
+                                               const HabitEventSource source) {
+  if (seconds == 0 || !day || !*day) return false;
+  return appendEvent(habitId, "duration", seconds, "seconds", source, day);
 }
 
 bool HabitEventLog::appendPomodoroFocus(const std::string& habitId, const uint32_t seconds) {

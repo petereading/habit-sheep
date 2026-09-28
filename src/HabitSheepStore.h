@@ -9,6 +9,7 @@
 #include <vector>
 
 enum class HabitType : uint8_t { Completion = 0, Duration = 1, Pomodoro = 2 };
+enum class HabitPeriod : uint8_t { Daily = 0, Weekly = 1 };
 
 struct HabitDefinition {
   std::string id;
@@ -19,6 +20,8 @@ struct HabitDefinition {
   uint16_t shortBreakMinutes = 5;
   uint16_t longBreakMinutes = 15;
   uint8_t sessionsPerCycle = 4;
+  HabitPeriod period = HabitPeriod::Daily;
+  uint8_t targetCount = 1;
 };
 
 class HabitSheepStore : public PersistableStore<HabitSheepStore> {

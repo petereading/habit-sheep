@@ -11,6 +11,7 @@ class HabitDurationActivity final : public Activity {
   HabitDurationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string habitId);
 
   void onEnter() override;
+  void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
 
@@ -18,6 +19,8 @@ class HabitDurationActivity final : public Activity {
   std::string habitId;
   int selection = 0;
   int lastRenderedMinute = -1;
+  int lastRenderedPhase = -1;
+  bool lastRenderedRunning = false;
   OptionPopup addMinutesPopup;
 
   struct ActionLabels {
@@ -28,5 +31,6 @@ class HabitDurationActivity final : public Activity {
   ActionLabels actionLabels() const;
   void activate();
   void showAddMinutes();
+  void showCustomMinutes();
   void continueReading();
 };
