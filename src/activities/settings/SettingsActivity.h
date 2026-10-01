@@ -32,7 +32,7 @@ enum class SettingAction {
   SheepName,
   ActiveHabits,
   HabitLibrary,
-  SleepSheepScene,
+  GrassHistory,
 };
 
 struct SettingInfo {

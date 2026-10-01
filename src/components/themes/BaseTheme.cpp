@@ -310,7 +310,7 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
 // looks like it overhangs the content columns.
 int BaseTheme::headerStatusInset() { return UITheme::getInstance().getMetrics().headerSidePadding + 4; }
 
-void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props) {
+void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props, const bool forceClock) {
   const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
   auto& status = props.status;
 
@@ -365,14 +365,14 @@ void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::Head
   // (SETTINGS.clockShowInHeader). Themes whose title layout has no room for
   // the clock's left reserve opt out via headerShowsClock.
   static char clockText[10];
-  if (metrics.headerShowsClock && SETTINGS.clockShowInHeader && halClock.isAvailable() &&
+  if ((forceClock || (metrics.headerShowsClock && SETTINGS.clockShowInHeader)) && halClock.isAvailable() &&
       halClock.formatTime(clockText, sizeof(clockText), SETTINGS.clockFormat == 1)) {
     status.clockText = clockText;
   }
 }
 
 void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
-                           const bool backButton) const {
+                           const bool backButton, const bool forceClock) const {
   // Every activity header renders through the FreeInkUI header + battery
   // indicator components, styled by the active theme's tokens (padding,
   // centering, underline). Non-interactive frame: no hit rects registered.
@@ -399,7 +399,7 @@ void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   props.rightLabel = subtitle;  // firmware headers right-align the secondary text
   // Battery + clock chrome and their title reserves live in the FreeInkUI
   // header component; this only fills the values from settings and metrics.
-  applyHeaderStatus(renderer, props);
+  applyHeaderStatus(renderer, props, forceClock);
   if (rect.height < UITheme::getInstance().getMetrics().headerHeight) {
     // Short bands (home) are not split into strip + content row: the title
     // centers on the band, clear of the band's bottom edge.

@@ -17,6 +17,7 @@
 #include "RecentBooksStore.h"
 #include "activities/ActivityManager.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "components/HabitReward.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -114,6 +115,8 @@ HabitDurationActivity::ActionLabels HabitDurationActivity::actionLabels() const 
       labels.items[labels.count++] = tr(STR_HABIT_START_FOCUS);
     else
       labels.items[labels.count++] = tr(STR_HABIT_RESUME_TIMER);
+    if (pomodoro && phase == HabitTimer::Phase::ShortBreak && !HABIT_TIMER.hasOtherRunning(habitId))
+      labels.items[labels.count++] = tr(STR_HABIT_SKIP_SHORT_BREAK);
     labels.items[labels.count++] = pomodoro ? tr(STR_HABIT_END_SESSION) : tr(STR_HABIT_STOP_LOG);
   } else if (HABIT_TIMER.isRunning()) {
     labels.items[labels.count++] = tr(STR_HABIT_PAUSE_OTHER);
@@ -194,6 +197,16 @@ void HabitDurationActivity::activate() {
       requestUpdate();
       return;
     }
+    const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
+    if (habit && habit->type == HabitType::Pomodoro && HABIT_TIMER.phaseFor(habitId) == HabitTimer::Phase::ShortBreak &&
+        !HABIT_TIMER.hasOtherRunning(habitId)) {
+      if (selection == index++) {
+        HABIT_TIMER.skipShortBreak(habitId);
+        selection = 0;
+        requestUpdate();
+        return;
+      }
+    }
     if (selection == index++) {
       HABIT_TIMER.stopAndLog(habitId);
       requestUpdate();
@@ -220,11 +233,16 @@ void HabitDurationActivity::activate() {
 }
 
 void HabitDurationActivity::loop() {
+  if (habitClock.changed()) requestUpdate();
   if (addMinutesPopup.isActive()) {
     addMinutesPopup.handleInput(mappedInput, [this] { requestUpdate(); });
     return;
   }
 
+  if (showHabitReward(addMinutesPopup, &habitId)) {
+    requestUpdate();
+    return;
+  }
   const auto labels = actionLabels();
   if (labels.count == 0) return;
   selection = std::clamp(selection, 0, labels.count - 1);
@@ -299,7 +317,7 @@ void HabitDurationActivity::render(RenderLock&&) {
     return;
   }
 
-  GUI.drawHeader(renderer, header, habit->name.c_str());
+  GUI.drawHeader(renderer, header, habit->name.c_str(), nullptr, true, true);
 
   auto progress = HABIT_EVENTS.progressForToday(habitId);
   if (HABIT_TIMER.isForHabit(habitId) && HABIT_TIMER.phaseFor(habitId) == HabitTimer::Phase::Focus)

@@ -834,9 +834,6 @@
       '<span class="setting-control"><input id="sheep-name" type="text" maxlength="96" value="' +
       escapeHtml(habitSheep.sheepName || '') + '"></span></div>' +
       '<button onclick="saveSheepName()">Save name</button>' +
-      '<div class="setting-row"><span class="setting-name">Sleep sheep scene</span>' +
-      '<span class="setting-control"><input id="sleep-sheep" type="checkbox" ' +
-      (habitSheep.sleepSceneEnabled ? 'checked' : '') + ' onchange="saveSleepSheep()"></span></div>' +
       '<h3>Active habits (maximum 3)</h3>';
     for (let slot = 0; slot < 3; slot++) {
       html += '<div class="setting-row"><span class="setting-name">Slot ' + (slot + 1) + '</span>' +
@@ -940,9 +937,6 @@
 
   function saveSheepName() {
     postHabitSheep({action: 'setSheepName', name: document.getElementById('sheep-name').value});
-  }
-  function saveSleepSheep() {
-    postHabitSheep({action: 'setSleepScene', enabled: document.getElementById('sleep-sheep').checked});
   }
   function saveActiveHabit(slot, id) { postHabitSheep({action: 'setActive', slot: slot, id: id}); }
   function editHabit(index) {

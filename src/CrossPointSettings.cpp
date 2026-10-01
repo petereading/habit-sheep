@@ -63,6 +63,7 @@ uint8_t CrossPointSettings::sleepTimeoutEnumToMinutes(const uint8_t legacyValue)
 
 void CrossPointSettings::toJson(JsonDocument& doc) const {
   const CrossPointSettings& s = *this;
+  doc["habitSheepSleepMigrated"] = habitSheepSleepMigrated;
 
   for (const auto& info : getSettingsList()) {
     if (!info.key) continue;
@@ -114,6 +115,7 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
 
 bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   CrossPointSettings& s = *this;
+  habitSheepSleepMigrated = doc["habitSheepSleepMigrated"] | false;
   bool needsResave = false;
 
   auto clamp = [](uint8_t val, uint8_t maxVal, uint8_t def) -> uint8_t { return val < maxVal ? val : def; };

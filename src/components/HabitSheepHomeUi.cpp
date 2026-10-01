@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <ctime>
 
+#include "CrossPointSettings.h"
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
@@ -118,7 +119,7 @@ void HabitSheepHomeUi::drawPasture(const int x, const int y, const int width, co
   const int groundY = y + height - 28;
   renderer.drawLine(x + 8, groundY, x + width - 8, groundY, 2, true);
 
-  const int level = std::min<int>(8, SHEEP_STATE.getPasturePoints() / 20);
+  const int level = std::min<int>(8, SHEEP_STATE.getGrassStock());
   const int span = std::max(48, width - 56);
   for (int i = 0; i < level; ++i) {
     const int px = x + 28 + (i * 47) % span;
@@ -141,25 +142,44 @@ void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, cons
   const int bodyY = y + std::max(42, height / 2 - 55);
 
   drawPasture(x, y, width, height);
-  renderer.drawRoundedRect(bodyX, bodyY, bodyW, bodyH, 3, 28, true);
-  renderer.fillRoundedRect(bodyX + bodyW - 34, bodyY + 22, 46, 48, 14, Color::Black);
-  renderer.fillRect(bodyX + 24, bodyY + bodyH - 2, 8, 28, true);
-  renderer.fillRect(bodyX + bodyW - 42, bodyY + bodyH - 2, 8, 28, true);
-  renderer.fillRect(bodyX + bodyW - 20, bodyY + 37, 4, 4, false);
-  renderer.fillRect(bodyX + bodyW - 7, bodyY + 37, 4, 4, false);
+  if (SHEEP_STATE.getGrassStock() == 0) {
+    const int signW = std::min(280, width - 30);
+    const int signX = cx - signW / 2;
+    const int groundY = y + height - 28;
+    renderer.fillRect(cx - 3, bodyY + 58, 6, std::max(0, groundY - bodyY - 58), true);
+    renderer.drawRoundedRect(signX, bodyY - 6, signW, 78, 2, 10, true);
+    const char* title = tr(STR_SHEEP_FORAGING);
+    const char* hint = tr(STR_SHEEP_RETURN_HINT);
+    renderer.drawText(UI_12_FONT_ID, cx - renderer.getTextWidth(UI_12_FONT_ID, title) / 2, bodyY + 4, title);
+    const auto shown = renderer.truncatedText(SMALL_FONT_ID, hint, signW - 16);
+    renderer.drawText(SMALL_FONT_ID, cx - renderer.getTextWidth(SMALL_FONT_ID, shown.c_str()) / 2, bodyY + 43,
+                      shown.c_str());
+    for (int i = 0; i < 3; ++i) renderer.fillRect(cx + 60 + i * 19, groundY - 8 - i * 8, 9, 4, true);
+  } else {
+    renderer.drawRoundedRect(bodyX, bodyY, bodyW, bodyH, 3, 28, true);
+    renderer.fillRoundedRect(bodyX + bodyW - 34, bodyY + 22, 46, 48, 14, Color::Black);
+    renderer.fillRect(bodyX + 24, bodyY + bodyH - 2, 8, 28, true);
+    renderer.fillRect(bodyX + bodyW - 42, bodyY + bodyH - 2, 8, 28, true);
+    renderer.fillRect(bodyX + bodyW - 20, bodyY + 37, 4, 4, false);
+    renderer.fillRect(bodyX + bodyW - 7, bodyY + 37, 4, 4, false);
 
-  if (sheepNudge == 1) {
-    renderer.drawLine(bodyX + bodyW + 15, bodyY + 10, bodyX + bodyW + 28, bodyY + 2, 2, true);
-    renderer.drawLine(bodyX + bodyW + 16, bodyY + 20, bodyX + bodyW + 31, bodyY + 20, 2, true);
-  } else if (sheepNudge == 2) {
-    renderer.drawLine(bodyX - 10, bodyY + 18, bodyX - 24, bodyY + 8, 2, true);
-    renderer.drawLine(bodyX - 9, bodyY + 28, bodyX - 25, bodyY + 30, 2, true);
+    if (sheepNudge == 1) {
+      renderer.drawLine(bodyX + bodyW + 15, bodyY + 10, bodyX + bodyW + 28, bodyY + 2, 2, true);
+      renderer.drawLine(bodyX + bodyW + 16, bodyY + 20, bodyX + bodyW + 31, bodyY + 20, 2, true);
+    } else if (sheepNudge == 2) {
+      renderer.drawLine(bodyX - 10, bodyY + 18, bodyX - 24, bodyY + 8, 2, true);
+      renderer.drawLine(bodyX - 9, bodyY + 28, bodyX - 25, bodyY + 30, 2, true);
+    }
   }
 
+  char grass[28];
+  snprintf(grass, sizeof(grass), tr(STR_SHEEP_GRASS_STOCK), static_cast<unsigned>(SHEEP_STATE.getGrassStock()),
+           static_cast<unsigned>(SheepStateStore::GRASS_CAP));
+  const int grassW = renderer.getTextWidth(SMALL_FONT_ID, grass);
   const char* label = (name && *name) ? name : "Habit Sheep";
-  const auto shown = renderer.truncatedText(UI_12_FONT_ID, label, width - 24);
-  const int textW = renderer.getTextWidth(UI_12_FONT_ID, shown.c_str());
-  renderer.drawText(UI_12_FONT_ID, x + (width - textW) / 2, y + 14, shown.c_str());
+  const auto shown = renderer.truncatedText(UI_12_FONT_ID, label, std::max(30, width - grassW - 36));
+  renderer.drawText(UI_12_FONT_ID, x + 12, y + 14, shown.c_str());
+  renderer.drawText(SMALL_FONT_ID, x + width - 12 - grassW, y + 14, grass);
 }
 
 void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, const int top, const int height) const {
@@ -261,6 +281,9 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, const bool showDoc
     char dateText[24];
     strftime(dateText, sizeof(dateText), "%a %d %b", &local);
     renderer.drawText(SMALL_FONT_ID, SIDE_PAD, 18, dateText);
+    char clock[10];
+    if (halClock.formatTime(clock, sizeof(clock), SETTINGS.clockFormat == 1))
+      renderer.drawText(SMALL_FONT_ID, SIDE_PAD + renderer.getTextWidth(SMALL_FONT_ID, dateText) + 18, 18, clock);
   }
 
   drawSheep(SIDE_PAD, sheepTop + 4, screenW - SIDE_PAD * 2, sheepHeight - 8, store.getSheepName().c_str());

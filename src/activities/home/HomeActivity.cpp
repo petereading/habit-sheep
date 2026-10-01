@@ -28,6 +28,7 @@
 #include "RecentBooksStore.h"
 #include "SheepStateStore.h"
 #include "activities/habits/HabitDurationActivity.h"
+#include "components/HabitReward.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -246,6 +247,7 @@ void HomeActivity::onEnter() {
     loadRecentBooks(1);
     hasContinueReading = !recentBooks.empty();
     HABIT_EVENTS.refreshToday();
+    SHEEP_STATE.settleDay();
     lastHabitProgressStamp = UINT32_MAX;
     selectorIndex = 0;
     requestUpdate();
@@ -359,9 +361,11 @@ void HomeActivity::activateHabitSheepSelection() {
   const auto action = habitSheepUi->actionForSelection(selectorIndex);
   switch (action) {
     case HabitSheepHomeUi::Action::Sheep:
-      SHEEP_STATE.recordInteraction();
-      habitSheepUi->nudgeSheep();
-      requestUpdate();
+      if (SHEEP_STATE.getGrassStock() > 0) {
+        SHEEP_STATE.recordInteraction();
+        habitSheepUi->nudgeSheep();
+        requestUpdate();
+      }
       break;
     case HabitSheepHomeUi::Action::Habit1:
     case HabitSheepHomeUi::Action::Habit2:
@@ -387,9 +391,9 @@ void HomeActivity::activateHabitSheepSelection() {
         const char* options[] = {tr(STR_CANCEL), tr(STR_HABIT_LOG_ONE)};
         habitReplacementPopup.show(tr(STR_HABIT_CONFIRM_DONE), headline, options, 2, 0,
                                    [this, id = habit->id](const int selected) {
-                                     if (selected == 1 && HABIT_EVENTS.appendCompletion(id)) {
+                                     if (selected != 1) return;
+                                     if (HABIT_EVENTS.appendCompletion(id)) {
                                        habitSheepUi->nudgeSheep();
-                                       habitRewardPending = true;
                                        requestUpdate();
                                      }
                                    });
@@ -430,6 +434,7 @@ void HomeActivity::activateHabitSheepSelection() {
 
 void HomeActivity::loopHabitSheepHome() {
   if (!habitSheepUi) return;
+  if (SHEEP_STATE.settleDay() || habitClock.changed()) requestUpdate();
 
   uint32_t progressStamp = 0;
   for (const auto& id : HABIT_SHEEP.getActiveHabitIds()) {
@@ -444,12 +449,11 @@ void HomeActivity::loopHabitSheepHome() {
 
   if (habitReplacementPopup.isActive()) {
     habitReplacementPopup.handleInput(mappedInput, [this] { requestUpdate(); });
-    if (habitRewardPending) {
-      habitRewardPending = false;
-      const char* options[] = {tr(STR_DONE)};
-      habitReplacementPopup.show(tr(STR_HABIT_REWARD_TITLE), tr(STR_HABIT_REWARD_MESSAGE), options, 1, 0, [](int) {});
-      requestUpdate();
-    }
+    return;
+  }
+
+  if (showHabitReward(habitReplacementPopup)) {
+    requestUpdate();
     return;
   }
 

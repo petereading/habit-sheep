@@ -254,14 +254,14 @@ class BaseTheme {
   // tappable back button leads the band (see HeaderBackTapTarget); root
   // screens that own their stack bottom pass backButton = false.
   virtual void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle = nullptr,
-                          bool backButton = true) const;
+                          bool backButton = true, bool forceClock = false) const;
   // Fill the battery/clock status chrome (settings + theme metrics) into
   // header props, so FUI-native screens drawing their own interactive header
   // carry the same band as drawHeader. Status text is styled with the
   // FONT_LABEL slot (bound to the fixed small font by makeUiTarget and
   // drawHeader). The label strings point at internal static buffers refreshed
   // per call (headers draw on the single render task).
-  static void applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props);
+  static void applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props, bool forceClock = false);
   // Edge inset drawHeader uses for the clock/battery status line (detached
   // layouts hug the corner with a legacy 12px inset instead of the padding).
   static int headerStatusInset();

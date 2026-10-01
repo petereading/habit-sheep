@@ -4,10 +4,13 @@
 #include <Memory.h>
 
 #include <algorithm>
+#include <cstdio>
 
 #include "HabitSheepStore.h"
+#include "SheepStateStore.h"
 #include "activities/ActivityManager.h"
 #include "activities/habits/ActiveHabitsActivity.h"
+#include "activities/habits/GrassHistoryActivity.h"
 #include "activities/habits/HabitLibraryActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
@@ -19,7 +22,7 @@ HabitSheepSettingsActivity::HabitSheepSettingsActivity(GfxRenderer& renderer, Ma
   rows[0].label = "Sheep name";
   rows[1].label = "Active habits";
   rows[2].label = "Habit library";
-  rows[3].label = "Sleep sheep scene";
+  rows[3].label = tr(STR_GRASS_HISTORY);
   rows[4].label = "CrossPoint settings";
   for (int i = 0; i < ROW_COUNT; ++i) rows[i].actionValue = static_cast<int16_t>(i);
 }
@@ -37,7 +40,10 @@ void HabitSheepSettingsActivity::refreshRows() {
                                      [](const std::string& id) { return !id.empty(); }));
   values[1] = std::to_string(activeCount) + " / 3 selected";
   values[2] = std::to_string(HABIT_SHEEP.getHabits().size()) + " / 9 saved";
-  values[3] = HABIT_SHEEP.isSleepSceneEnabled() ? "On" : "Off";
+  char grassSubtitle[52];
+  snprintf(grassSubtitle, sizeof(grassSubtitle), tr(STR_GRASS_HISTORY_SUBTITLE),
+           static_cast<unsigned>(SHEEP_STATE.getGrassStock()), static_cast<unsigned>(SheepStateStore::GRASS_CAP));
+  values[3] = grassSubtitle;
   values[4] = "Reader, display, network & system";
 
   for (int i = 0; i < ROW_COUNT; ++i) rows[i].subtitle = values[i].c_str();
@@ -65,9 +71,8 @@ void HabitSheepSettingsActivity::activateIndex(const int index) {
   } else if (index == 2) {
     activityManager.pushActivity(std::make_unique<HabitLibraryActivity>(renderer, mappedInput));
   } else if (index == 3) {
-    HABIT_SHEEP.setSleepSceneEnabled(!HABIT_SHEEP.isSleepSceneEnabled());
-    refreshRows();
-    requestUpdate();
+    auto history = makeUniqueNoThrow<GrassHistoryActivity>(renderer, mappedInput);
+    if (history) activityManager.pushActivity(std::move(history));
   } else if (index == 4) {
     activityManager.goToSettings();
   }

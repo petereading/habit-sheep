@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <functional>
 #include <string>
 #include <vector>
@@ -11,6 +12,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
+#include "fontIds.h"
 
 // Modal option picker drawn over the current screen (no clear) via
 // fui::optionDialog. Touch hit-testing is the SDK's InteractionBuffer: each
@@ -181,6 +183,8 @@ class OptionPopup {
     fui::OptionDialogProps props;
     props.title = title.c_str();
     props.headline = headline.empty() ? nullptr : headline.c_str();
+    props.message = grassBadge ? rewardText : nullptr;
+    props.contentHeight = grassBadge ? 40 : 0;
     props.options = options;
     props.optionCount = count;
     props.verticalOptions = true;
@@ -196,6 +200,7 @@ class OptionPopup {
     props.headlineText.font = fui::GfxRendererTarget::FONT_BODY;
     props.headlineText.align = fui::TextAlign::Center;
     props.headlineText.maxLines = 3;
+    props.messageText = props.headlineText;
     props.buttonText.font = fui::GfxRendererTarget::FONT_BODY;
     const int16_t innerPadding = static_cast<int16_t>(metrics.optionPopupInnerPadding);
     props.padding = fui::Insets{innerPadding, innerPadding, innerPadding, innerPadding};
@@ -229,7 +234,21 @@ class OptionPopup {
     // Chrome guard first, options after: route() scans newest-first, so the
     // option buttons win inside the dialog and the guard absorbs the rest.
     frame.hit(dialogRect, ACTION_CHROME, 0, fui::InputTouch);
-    fui::optionDialog(frame, dialogRect, props);
+    const fui::Rect content = fui::optionDialog(frame, dialogRect, props);
+    if (grassBadge) {
+      char amount[20];
+      if (grassGain)
+        snprintf(amount, sizeof(amount), "+%u", static_cast<unsigned>(grassGain));
+      else
+        snprintf(amount, sizeof(amount), "%u/%u", static_cast<unsigned>(grassStock), 14U);
+      const int amountW = renderer.getTextWidth(NOTOSANS_14_FONT_ID, amount);
+      const int x = content.x + (content.width - amountW - 38) / 2;
+      const int y = content.y + 2;
+      renderer.drawLine(x + 14, y + 32, x + 14, y + 4, 2, true);
+      renderer.drawLine(x + 14, y + 23, x + 3, y + 13, 2, true);
+      renderer.drawLine(x + 14, y + 16, x + 25, y + 7, 2, true);
+      renderer.drawText(NOTOSANS_14_FONT_ID, x + 38, y + 4, amount);
+    }
     // Atomically make this generation the one handleInput() reads, now that
     // every hit() call for this frame is done.
     interactions.publish();
@@ -237,6 +256,15 @@ class OptionPopup {
   }
 
   bool isActive() const { return active; }
+
+  void showGrassReward(const char* habitName, const char* message, const uint16_t grass, const uint8_t stock) {
+    const char* options[] = {tr(STR_DONE)};
+    show(tr(STR_HABIT_REWARD_TITLE), habitName, options, 1, 0, [](int) {});
+    snprintf(rewardText, sizeof(rewardText), "%s", message);
+    grassBadge = true;
+    grassGain = grass;
+    grassStock = stock;
+  }
 
   // Close without firing the callback (the surface under the popup is going
   // away, e.g. its host screen closes from outside the popup's own input).
@@ -255,6 +283,7 @@ class OptionPopup {
   static constexpr freeink::ui::ActionId ACTION_CHROME = 2;
 
   void activate(int currentIndex, std::function<void(int)> onSelect) {
+    grassBadge = false;
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
     selectedIndex = currentIndex >= 0 && currentIndex < count ? currentIndex : 0;
     onSelectCallback = std::move(onSelect);
@@ -263,6 +292,10 @@ class OptionPopup {
   }
 
   bool active = false;
+  bool grassBadge = false;
+  uint16_t grassGain = 0;
+  uint8_t grassStock = 0;
+  char rewardText[80]{};
   std::string title;
   std::string headline;
   std::vector<std::string> ownedStrings;

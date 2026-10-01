@@ -116,6 +116,26 @@ uint32_t HabitTimer::stopAndLog(const std::string& id) {
   return seconds;
 }
 
+bool HabitTimer::skipShortBreak(const std::string& id) {
+  Session* session = find(id);
+  const HabitDefinition* habit = HABIT_SHEEP.findHabit(id);
+  if (!session || !habit || habit->type != HabitType::Pomodoro || session->phase != Phase::ShortBreak ||
+      hasOtherRunning(id))
+    return false;
+  const uint32_t previousMs = elapsedMs(*session);
+  const bool wasRunning = session->running;
+  session->phase = Phase::Focus;
+  session->accumulatedMs = 0;
+  session->startedAtMs = millis();
+  session->running = true;
+  if (saveToFile()) return true;
+  session->phase = Phase::ShortBreak;
+  session->accumulatedMs = previousMs;
+  session->startedAtMs = millis();
+  session->running = wasRunning;
+  return false;
+}
+
 void HabitTimer::tick() {
   for (auto& session : sessions) {
     if (session.habitId.empty()) continue;
@@ -126,7 +146,20 @@ void HabitTimer::tick() {
       return;
     }
     if (!session.running) continue;
-    if (habit->type != HabitType::Pomodoro) continue;
+    if (habit->type != HabitType::Pomodoro) {
+      const uint32_t seconds = elapsedMs(session) / 1000;
+      if (millis() - session.lastTargetCheckMs < 1000) continue;
+      session.lastTargetCheckMs = millis();
+      const uint32_t target = static_cast<uint32_t>(habit->targetMinutes) * 60;
+      const uint32_t logged = HABIT_EVENTS.progressForToday(session.habitId).durationSeconds;
+      if (habit->type == HabitType::Duration && logged < target && seconds >= target - logged) {
+        if (!HABIT_EVENTS.appendDurationSeconds(session.habitId, seconds, HabitEventSource::Timer)) return;
+        session.accumulatedMs = elapsedMs(session) - seconds * 1000;
+        session.startedAtMs = millis();
+        saveToFile();
+      }
+      continue;
+    }
     const uint32_t targetSeconds =
         static_cast<uint32_t>(session.phase == Phase::Focus        ? habit->targetMinutes
                               : session.phase == Phase::ShortBreak ? habit->shortBreakMinutes

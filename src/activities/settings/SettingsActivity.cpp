@@ -30,10 +30,12 @@
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
+#include "SheepStateStore.h"
 #include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
 #include "activities/habits/ActiveHabitsActivity.h"
+#include "activities/habits/GrassHistoryActivity.h"
 #include "activities/habits/HabitLibraryActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
@@ -126,7 +128,7 @@ void SettingsActivity::rebuildSettingsLists() {
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
-  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SLEEP_SHEEP_SCENE, SettingAction::SleepSheepScene));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_GRASS_HISTORY, SettingAction::GrassHistory));
 
   // Update currentSettings pointer and count for the active category
   switch (selectedCategoryIndex) {
@@ -392,10 +394,15 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
         break;
       }
-      case SettingAction::SleepSheepScene:
-        HABIT_SHEEP.setSleepSceneEnabled(!HABIT_SHEEP.isSleepSceneEnabled());
-        requestUpdate();
+      case SettingAction::GrassHistory: {
+        auto activity = makeUniqueNoThrow<GrassHistoryActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Grass history");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
         break;
+      }
       case SettingAction::HomeButton: {
         // Activities must outlive this call and are owned by the activity stack.
         auto activity = makeUniqueNoThrow<HomeButtonSettingsActivity>(renderer, mappedInput);
@@ -558,8 +565,12 @@ std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
            "/3";
   }
   if (setting.action == SettingAction::HabitLibrary) return std::to_string(HABIT_SHEEP.getHabits().size()) + "/9";
-  if (setting.action == SettingAction::SleepSheepScene)
-    return HABIT_SHEEP.isSleepSceneEnabled() ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  if (setting.action == SettingAction::GrassHistory) {
+    char value[32];
+    snprintf(value, sizeof(value), tr(STR_SHEEP_GRASS_STOCK), static_cast<unsigned>(SHEEP_STATE.getGrassStock()),
+             static_cast<unsigned>(SheepStateStore::GRASS_CAP));
+    return value;
+  }
   if (setting.action == SettingAction::HomeButton) return tr(STR_CONFIGURE);
   if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
     return SETTINGS.*(setting.valuePtr) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);

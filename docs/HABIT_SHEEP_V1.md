@@ -6,7 +6,7 @@ Habit Sheep is an e-ink habit companion and virtual sheep built as a thin fork o
 
 - CrossPoint remains a reader. Habit Sheep must not make reading feel compulsory.
 - The sheep and habit system must be fully useful offline and without AI.
-- Positive reinforcement only: no starvation, illness, death, punishment, guilt, or loss of pasture for missed habits.
+- Positive reinforcement only: no starvation, illness, death, punishment, guilt, or grass debt for missed habits.
 - Keep the low-end ESP32-C3 devices as the baseline. Touch and higher-memory devices may add richer interactions without changing core functionality.
 - Minimise friction: most daily actions should be possible directly from Home.
 - Preserve upstream CrossPoint navigation and reader capabilities wherever practical.
@@ -23,6 +23,8 @@ Habit Sheep is an e-ink habit companion and virtual sheep built as a thin fork o
   - Completion: complete once for the configured period/day.
   - Duration: accumulate minutes toward a target.
 - Duration habits support Start, Pause, Stop, and manual +minutes logging.
+- Reaching a Duration target checkpoints elapsed time and shows the reward while the timer keeps running. Stopping later logs only the remaining time.
+- Short Pomodoro breaks may be skipped to start the next focus immediately. Skipping never earns grass.
 - While a Duration timer is actively running, automatic sleep is prevented.
 - E-ink does not need a per-second redraw. Time is calculated from timestamps; the screen may refresh at a low cadence and immediately after input.
 
@@ -35,7 +37,7 @@ A Duration habit may optionally enable CrossPoint Reading integration. When enab
 - manual +minutes logging;
 - Continue Reading;
 - Browse Files / books;
-- automatic CrossPoint active-reading events when that capability is implemented.
+- automatic CrossPoint active-reading events, including correct allocation across local calendar days. Reward notices appear on returning Home.
 
 If no habit has Reading integration, CrossPoint reading remains normal and does not create a daily reading obligation.
 
@@ -58,7 +60,7 @@ Candidate sources include manual completion, manual timer, manual adjustment, an
 Habit Sheep Home is a dedicated Home mode, not merely a global UI theme. Users should still be able to use the normal CrossPoint styling on Library, Settings, Reader, etc.
 
 Home hierarchy:
-1. Sheep + persistent pasture: the largest visual area.
+1. Sheep + current grass stock: the largest visual area.
 2. Up to 3 Active habits.
 3. Bottom icon dock containing CrossPoint's existing major functions.
 
@@ -82,24 +84,33 @@ Touch devices:
 - Users name their sheep during onboarding and may rename it later in Settings.
 - Sheep appearance is customisation, not tied to habit category.
 - Ordinary sheep interaction does not count as habit completion.
-- Habit completion contributes to care/growth/pasture.
+- Habit completion replenishes the grass stock.
 - Sheep interaction contributes to relationship/bond.
 - Bond does not need a visible numeric score. It is expressed through behaviour, e.g. looking at the user, approaching, resting nearby, or running over when called.
 - No penalty for not interacting.
 
 ## Sheep life and pasture
 
-The sheep has lightweight autonomous ambient behaviour such as sleeping, grazing, sitting, wandering, playing, approaching the user, and finding a clover.
+Autonomous ambient behaviour such as sleeping, grazing, sitting, wandering, playing and approaching the user is planned for a later slice. The current firmware provides static sheep/foraging scenes and a small response to manual interaction.
 
 Do not simulate continuously while the device is powered off. Persist the last state/time and advance coarse state from elapsed time on wake.
 
-The pasture is persistent and grows through positive habit activity. Decorations may be unlocked over time (flowers, tree, rocks, pond, butterflies, sheep house, etc.). Missing a habit does not remove progress.
+Grass is the only resource in V1. The sheep eats one grass per local calendar day. The stock holds at most 14 grass, begins at three, and never becomes negative. When empty, the sheep goes out to forage on its own and the pen shows a playful sign explaining that new grass brings it home. The next earned grass returns it immediately. It cannot starve or die. There are no coins, decoration purchases, or other collectible resources.
+
+- Each valid completion of a daily or weekly count habit earns one grass, up to the configured target count. A weekly goal earns enough extra grass at its final completion to provide at least seven in total for the week.
+- Reaching a duration habit's daily target earns one grass, once for that habit and day. Finishing each Pomodoro focus session earns one; breaks and partial sessions do not.
+- The visible grass represents the current stock, not lifetime earnings. The completion message shows the amount actually added; when the stock is full it says so instead of claiming an award.
+- Habit Sheep Settings includes a 14-day grass history with the grass earned and eaten per local day. Days before this rule is installed have no fabricated history.
+- Feeding is settled once per calendar day when the device next wakes or opens Home. Missed days consume only available stock, with no debt. If the clock is unavailable, feeding waits for a valid local date.
+- Existing V1 pasture points are converted into a starting stock without clearing saved habits or event logs.
 
 Short optional e-ink-friendly interactions/minigames may be added without coins, XP, daily quests, leaderboards, or endless loops.
 
 ## Sleep screen
 
 Habit Sheep provides a dedicated static sleep scene using the e-ink panel's image retention.
+
+Select Habit Sheep in Display → Sleep Screen. Cover and the other existing choices remain available; there is no separate sheep-scene toggle. The legacy effective choice is migrated once. Quick Resume retains its existing timeout rules. Home and habit timer screens show a clock updated on minute changes while awake; the static sheep sleep screen does not.
 
 The sleep scene should prioritise:
 - sheep + persistent pasture;

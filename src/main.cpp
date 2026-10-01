@@ -438,6 +438,12 @@ void setup() {
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
   HABIT_SHEEP.loadFromFile();
+  if (!SETTINGS.habitSheepSleepMigrated) {
+    if (HABIT_SHEEP.legacySleepSceneEnabled() && SETTINGS.sleepScreen != CrossPointSettings::QUICK_RESUME)
+      SETTINGS.sleepScreen = CrossPointSettings::HABIT_SHEEP_SCENE;
+    SETTINGS.habitSheepSleepMigrated = true;
+    if (!SETTINGS.saveToFile()) SETTINGS.habitSheepSleepMigrated = false;
+  }
   HABIT_TIMER.loadFromFile();
   SHEEP_STATE.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "activities/Activity.h"
+#include "components/HabitClock.h"
 #include "components/OptionPopup.h"
 
 class HabitDurationActivity final : public Activity {
@@ -22,9 +23,10 @@ class HabitDurationActivity final : public Activity {
   int lastRenderedPhase = -1;
   bool lastRenderedRunning = false;
   OptionPopup addMinutesPopup;
+  HabitClock habitClock;
 
   struct ActionLabels {
-    std::array<const char*, 5> items{};
+    std::array<const char*, 6> items{};
     int count = 0;
   };
 

@@ -1,8 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include "HabitSheepStore.h"
 
 enum class HabitEventSource : uint8_t { Manual = 0, Timer = 1, Reader = 2 };
 
@@ -15,7 +18,13 @@ struct HabitDailyProgress {
 
 class HabitEventLog {
  public:
+  struct RewardNotice {
+    char habitId[HabitSheepStore::MAX_ID_BYTES + 1]{};
+    uint16_t grass = 0;
+    uint8_t stock = 0;
+  };
   static HabitEventLog& getInstance();
+  bool takeReward(RewardNotice& notice, const std::string* habitId = nullptr);
 
   bool refreshToday();
   HabitDailyProgress progressForToday(const std::string& habitId);
@@ -40,11 +49,14 @@ class HabitEventLog {
   std::string cachedDay;
   std::vector<CachedProgress> cachedProgress;
   std::vector<CachedWeekCount> cachedWeekCounts;
+  std::array<RewardNotice, HabitSheepStore::MAX_HABITS> pendingRewards{};
+  void awardGrass(const std::string& habitId, uint8_t amount, const char* day = nullptr);
 
   bool currentDay(std::string& day, int64_t& epoch) const;
   std::string pathForDay(const std::string& day) const;
   CachedProgress& progressEntry(const std::string& habitId);
   uint16_t completionCountForDay(const std::string& habitId, const std::string& day) const;
+  uint32_t durationSecondsForDay(const std::string& habitId, const std::string& day) const;
   bool appendEvent(const std::string& habitId, const char* type, uint32_t amount, const char* unit,
                    HabitEventSource source, const char* dayOverride = nullptr);
 };

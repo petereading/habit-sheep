@@ -1416,8 +1416,6 @@ void CrossPointWebServer::handlePostHabitSheep() {
   } else if (strcmp(action, "setSheepName") == 0) {
     const char* name = doc["name"] | "";
     if (strlen(name) <= HabitSheepStore::MAX_NAME_BYTES) valid = HABIT_SHEEP.setSheepName(name);
-  } else if (strcmp(action, "setSleepScene") == 0 && doc["enabled"].is<bool>()) {
-    valid = HABIT_SHEEP.setSleepSceneEnabled(doc["enabled"].as<bool>());
   }
 
   server->send(valid ? 200 : 400, "text/plain", valid ? "Saved" : "Invalid habit setting or save failed");

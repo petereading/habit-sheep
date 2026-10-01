@@ -6,6 +6,7 @@
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "components/CoverGridHomeUi.h"
+#include "components/HabitClock.h"
 #include "components/HabitSheepHomeUi.h"
 #include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
@@ -20,7 +21,7 @@ class HomeActivity final : public Activity {
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
   uint32_t lastHabitProgressStamp = UINT32_MAX;
-  bool habitRewardPending = false;
+  HabitClock habitClock;
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;

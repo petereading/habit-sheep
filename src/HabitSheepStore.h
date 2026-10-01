@@ -56,14 +56,13 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   const std::string& getSheepName() const { return sheepName; }
   const std::vector<HabitDefinition>& getHabits() const { return habits; }
   const std::array<std::string, MAX_ACTIVE_HABITS>& getActiveHabitIds() const { return activeHabitIds; }
-  bool isSleepSceneEnabled() const { return sleepSceneEnabled; }
+  bool legacySleepSceneEnabled() const { return sleepSceneEnabled; }
 
   const HabitDefinition* findHabit(const std::string& id) const;
   bool setSheepName(const std::string& name);
   bool upsertHabit(const HabitDefinition& habit);
   bool removeHabit(const std::string& id);
   bool setActiveHabit(size_t slot, const std::string& habitId);
-  bool setSleepSceneEnabled(bool enabled);
 };
 
 #define HABIT_SHEEP HabitSheepStore::getInstance()

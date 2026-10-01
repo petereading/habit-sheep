@@ -18,6 +18,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
   bool start(const std::string& habitId);
   bool pause(const std::string& habitId);
   bool resume(const std::string& habitId);
+  bool skipShortBreak(const std::string& habitId);
   uint32_t stopAndLog(const std::string& habitId);
   void tick();
 
@@ -34,6 +35,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
     std::string habitId;
     uint32_t accumulatedMs = 0;
     unsigned long startedAtMs = 0;
+    unsigned long lastTargetCheckMs = 0;
     Phase phase = Phase::Focus;
     bool running = false;
   };
