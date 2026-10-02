@@ -43,15 +43,16 @@ void GrassHistoryActivity::render(RenderLock&&) {
            static_cast<unsigned>(SheepStateStore::GRASS_CAP));
   const int top = safe.y + metrics.topPadding + metrics.headerHeight + 15;
   renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top, stock);
-  renderer.drawCenteredText(SMALL_FONT_ID, top + 34, tr(STR_GRASS_HISTORY_HINT));
+  renderer.drawCenteredText(SMALL_FONT_ID, top + 30, tr(STR_GRASS_HISTORY_HINT));
+  renderer.drawCenteredText(SMALL_FONT_ID, top + 50, tr(STR_GRASS_MEALS));
 
   tm today{};
   if (!halClock.isAvailable() || !halClock.localTime(today)) {
     renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top + 65, tr(STR_GRASS_CLOCK_UNAVAILABLE));
   } else {
     const bool compact = renderer.getScreenHeight() <= 600;
-    const int rowH = compact ? 40 : 68;
-    const int listTop = top + (compact ? 68 : 75);
+    const int rowH = compact ? 38 : 68;
+    const int listTop = top + (compact ? 78 : 85);
     for (int i = 0; i < 7; ++i) {
       tm day = today;
       day.tm_mday -= page * 7 + i;
@@ -71,6 +72,7 @@ void GrassHistoryActivity::render(RenderLock&&) {
                  static_cast<unsigned>(entry.eaten));
       else
         snprintf(amounts, sizeof(amounts), "%s", tr(STR_GRASS_NO_ENTRY));
+      if (entry.paused) renderer.drawText(SMALL_FONT_ID, left + 140, y + 2, tr(STR_GRASS_PAUSED));
       renderer.drawText(NOTOSANS_14_FONT_ID, right - renderer.getTextWidth(NOTOSANS_14_FONT_ID, amounts), y, amounts);
       if (i < 6) renderer.drawLine(left, y + rowH - 8, right, y + rowH - 8, true);
     }

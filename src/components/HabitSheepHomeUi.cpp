@@ -1,8 +1,12 @@
 #include "HabitSheepHomeUi.h"
 
+#include <Bitmap.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
 #include <HalPowerManager.h>
+#include <HalStorage.h>
+#include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -14,6 +18,7 @@
 #include "HabitTimer.h"
 #include "I18n.h"
 #include "MappedInputManager.h"
+#include "RecentBooksStore.h"
 #include "SheepStateStore.h"
 #include "components/UITheme.h"
 #include "components/icons/blocks.h"
@@ -59,7 +64,7 @@ int HabitSheepHomeUi::nextSelection(const int value) {
   int next = value;
   do {
     next = (next + 1 + SELECTION_COUNT) % SELECTION_COUNT;
-  } while (next >= 1 && next <= 3 && HABIT_SHEEP.getActiveHabitIds()[next - 1].empty());
+  } while (next >= 1 && next <= 3 && (!HABIT_SHEEP.isEnabled() || HABIT_SHEEP.getActiveHabitIds()[next - 1].empty()));
   return next;
 }
 
@@ -67,7 +72,8 @@ int HabitSheepHomeUi::previousSelection(const int value) {
   int previous = value;
   do {
     previous = (previous - 1 + SELECTION_COUNT) % SELECTION_COUNT;
-  } while (previous >= 1 && previous <= 3 && HABIT_SHEEP.getActiveHabitIds()[previous - 1].empty());
+  } while (previous >= 1 && previous <= 3 &&
+           (!HABIT_SHEEP.isEnabled() || HABIT_SHEEP.getActiveHabitIds()[previous - 1].empty()));
   return previous;
 }
 
@@ -83,11 +89,14 @@ int HabitSheepHomeUi::selectedAction(MappedInputManager& input) const {
   const int sheepTop = HEADER_H;
   const int sheepHeight = std::max(0, habitsTop - sheepTop);
 
-  if (input.wasTapInRect(0, sheepTop, screenW, sheepHeight)) return 0;
+  if (input.wasTapInRect(0, sheepTop, screenW, HABIT_SHEEP.isEnabled() ? sheepHeight : screenH - DOCK_H - sheepTop))
+    return 0;
 
   int row = -1;
   const auto habitTouch = input.rowTouch(row, habitsTop, HABIT_ROW_H, 3, SIDE_PAD, screenW - SIDE_PAD, HABIT_ROW_H);
-  if (habitTouch == MappedInputManager::RowTouch::Tap && !HABIT_SHEEP.getActiveHabitIds()[row].empty()) return 1 + row;
+  if (HABIT_SHEEP.isEnabled() && habitTouch == MappedInputManager::RowTouch::Tap &&
+      !HABIT_SHEEP.getActiveHabitIds()[row].empty())
+    return 1 + row;
 
   int col = -1;
   const int slotW = screenW / DOCK_COUNT;
@@ -98,6 +107,7 @@ int HabitSheepHomeUi::selectedAction(MappedInputManager& input) const {
 }
 
 int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
+  if (!HABIT_SHEEP.isEnabled()) return -1;
   const int screenH = renderer.getScreenHeight();
   const int habitsTop = screenH - DOCK_H - 3 * HABIT_ROW_H;
 
@@ -135,19 +145,23 @@ void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, cons
                                  const bool showSelection) const {
   if (showSelection && selection == 0) renderer.drawRoundedRect(x, y, width, height, 2, 16, true);
 
-  const int cx = x + width / 2;
+  tm local{};
+  const bool hasTime = halClock.isAvailable() && halClock.localTime(local);
+  const bool sleeping = SHEEP_STATE.isResting() || (hasTime && (local.tm_hour >= 22 || local.tm_hour < 7));
+  const int wander = hasTime && !sleeping ? ((local.tm_min / 10) % 3 - 1) * 12 : 0;
+  const int cx = x + width / 2 + wander + (SHEEP_STATE.getBondPoints() >= 5 ? std::min(24, width / 12) : 0);
   const int bodyW = std::min(150, width / 2);
-  const int bodyH = 82;
+  const int bodyH = std::min(82, std::max(42, height - 122));
   const int bodyX = cx - bodyW / 2;
-  const int bodyY = y + std::max(42, height / 2 - 55);
+  const int bodyY = y + std::max(72, height / 2 - 45);
 
   drawPasture(x, y, width, height);
-  if (SHEEP_STATE.getGrassStock() == 0) {
+  if (SHEEP_STATE.isForaging()) {
     const int signW = std::min(280, width - 30);
     const int signX = cx - signW / 2;
     const int groundY = y + height - 28;
     renderer.fillRect(cx - 3, bodyY + 58, 6, std::max(0, groundY - bodyY - 58), true);
-    renderer.drawRoundedRect(signX, bodyY - 6, signW, 78, 2, 10, true);
+    renderer.drawRoundedRect(signX, bodyY - 6, signW, std::min(78, height - 92), 2, 10, true);
     const char* title = tr(STR_SHEEP_FORAGING);
     const char* hint = tr(STR_SHEEP_RETURN_HINT);
     renderer.drawText(UI_12_FONT_ID, cx - renderer.getTextWidth(UI_12_FONT_ID, title) / 2, bodyY + 4, title);
@@ -157,11 +171,16 @@ void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, cons
     for (int i = 0; i < 3; ++i) renderer.fillRect(cx + 60 + i * 19, groundY - 8 - i * 8, 9, 4, true);
   } else {
     renderer.drawRoundedRect(bodyX, bodyY, bodyW, bodyH, 3, 28, true);
-    renderer.fillRoundedRect(bodyX + bodyW - 34, bodyY + 22, 46, 48, 14, Color::Black);
-    renderer.fillRect(bodyX + 24, bodyY + bodyH - 2, 8, 28, true);
-    renderer.fillRect(bodyX + bodyW - 42, bodyY + bodyH - 2, 8, 28, true);
-    renderer.fillRect(bodyX + bodyW - 20, bodyY + 37, 4, 4, false);
-    renderer.fillRect(bodyX + bodyW - 7, bodyY + 37, 4, 4, false);
+    renderer.fillRoundedRect(bodyX + bodyW - 34, bodyY + 22, 46, std::min(48, bodyH - 22), 14, Color::Black);
+    renderer.fillRect(bodyX + 24, bodyY + bodyH - 2, 8, 20, true);
+    renderer.fillRect(bodyX + bodyW - 42, bodyY + bodyH - 2, 8, 20, true);
+    if (sleeping) {
+      renderer.drawLine(bodyX + bodyW - 20, bodyY + 39, bodyX + bodyW - 16, bodyY + 39, false);
+      renderer.drawLine(bodyX + bodyW - 7, bodyY + 39, bodyX + bodyW - 3, bodyY + 39, false);
+    } else {
+      renderer.fillRect(bodyX + bodyW - 20, bodyY + 37, 4, 4, false);
+      renderer.fillRect(bodyX + bodyW - 7, bodyY + 37, 4, 4, false);
+    }
 
     if (sheepNudge == 1) {
       renderer.drawLine(bodyX + bodyW + 15, bodyY + 10, bodyX + bodyW + 28, bodyY + 2, 2, true);
@@ -172,11 +191,27 @@ void HabitSheepHomeUi::drawSheep(const int x, const int y, const int width, cons
     }
   }
 
+  // Five heart outlines; fill only the current mood, independent of friendship.
+  static constexpr uint16_t heartRows[] = {0x3180, 0x7bc0, 0xffe0, 0xffe0, 0xffe0,
+                                           0x7fc0, 0x3f80, 0x1f00, 0x0e00, 0x0400};
+  for (int heart = 0; heart < 5; ++heart) {
+    for (int row = 0; row < 10; ++row) {
+      for (int col = 0; col < 11; ++col) {
+        const uint16_t bit = 0x8000 >> col;
+        if (!(heartRows[row] & bit)) continue;
+        const bool edge = row == 0 || row == 9 || col == 0 || col == 10 || !(heartRows[row] & (bit << 1)) ||
+                          !(heartRows[row] & (bit >> 1)) || !(heartRows[row - 1] & bit) || !(heartRows[row + 1] & bit);
+        if (heart < SHEEP_STATE.getMood() || edge)
+          renderer.fillRect(x + 14 + heart * 25 + col * 2, y + 44 + row * 2, 2, 2, true);
+      }
+    }
+  }
+  renderer.drawText(SMALL_FONT_ID, x + 150, y + 42, sleeping ? tr(STR_SHEEP_RESTING) : tr(STR_SHEEP_MOOD));
   char grass[28];
   snprintf(grass, sizeof(grass), tr(STR_SHEEP_GRASS_STOCK), static_cast<unsigned>(SHEEP_STATE.getGrassStock()),
            static_cast<unsigned>(SheepStateStore::GRASS_CAP));
   const int grassW = renderer.getTextWidth(SMALL_FONT_ID, grass);
-  const char* label = (name && *name) ? name : "Habit Sheep";
+  const char* label = (name && *name) ? name : tr(STR_HABIT_SHEEP);
   const auto shown = renderer.truncatedText(UI_12_FONT_ID, label, std::max(30, width - grassW - 36));
   renderer.drawText(UI_12_FONT_ID, x + 12, y + 14, shown.c_str());
   renderer.drawText(SMALL_FONT_ID, x + width - 12 - grassW, y + 14, grass);
@@ -261,7 +296,7 @@ void HabitSheepHomeUi::drawDock(const int top, const int height) const {
   }
 }
 
-void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, const bool showDock) const {
+void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, const bool showDock, const RecentBook* book) const {
   const int screenW = renderer.getScreenWidth();
   const int screenH = renderer.getScreenHeight();
   const int habitsTop = screenH - DOCK_H - 3 * HABIT_ROW_H;
@@ -286,6 +321,35 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, const bool showDoc
       renderer.drawText(SMALL_FONT_ID, SIDE_PAD + renderer.getTextWidth(SMALL_FONT_ID, dateText) + 18, 18, clock);
   }
 
+  if (!store.isEnabled()) {
+    const int coverH = std::min(260, screenH - DOCK_H - HEADER_H - 110);
+    const int coverW = coverH * 2 / 3;
+    const int coverX = (screenW - coverW) / 2;
+    const int coverY = HEADER_H + 35;
+    renderer.drawCenteredText(SMALL_FONT_ID, HEADER_H + 4, tr(STR_GRASS_PAUSED));
+    bool drawn = false;
+    if (book && !book->coverBmpPath.empty()) {
+      const auto path = UITheme::getCoverThumbPath(book->coverBmpPath, coverH);
+      HalFile file;
+      if (Storage.openFileForRead("HOME", path.c_str(), file)) {
+        // The bitmap palette exceeds the task stack budget; one temporary object per cover redraw.
+        auto bitmap = makeUniqueNoThrow<Bitmap>(file);
+        if (!bitmap)
+          LOG_ERR("HOME", "OOM: paused book cover");
+        else if (bitmap->parseHeaders() == BmpReaderError::Ok)
+          drawn = renderer.drawBitmap(*bitmap, coverX, coverY, coverW, coverH);
+      }
+    }
+    if (!drawn) GUI.drawCoverPlaceholder(renderer, Rect{coverX, coverY, coverW, coverH});
+    const auto title =
+        renderer.truncatedText(UI_12_FONT_ID, book ? book->title.c_str() : tr(STR_CONTINUE_READING), screenW - 48);
+    renderer.drawCenteredText(UI_12_FONT_ID, coverY + coverH + 18, title.c_str());
+    if (selection == 0)
+      renderer.drawRoundedRect(SIDE_PAD, HEADER_H + 2, screenW - 2 * SIDE_PAD, screenH - DOCK_H - HEADER_H - 6, 2, 12,
+                               true);
+    if (showDock) drawDock(screenH - DOCK_H, DOCK_H);
+    return;
+  }
   drawSheep(SIDE_PAD, sheepTop + 4, screenW - SIDE_PAD * 2, sheepHeight - 8, store.getSheepName().c_str());
   drawHabitRows(store, habitsTop, HABIT_ROW_H);
   if (showDock) drawDock(screenH - DOCK_H, DOCK_H);

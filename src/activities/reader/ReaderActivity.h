@@ -19,6 +19,7 @@ class ReaderActivity : public Activity {
   std::atomic<bool> pageRendered{false};
   bool bookRemembered = false;
   bool readingTimeTracked = false;
+  uint32_t readingModeRevision = 0;
   unsigned long readingLastRecordedMs = 0;
   unsigned long readingLastCheckMs = 0;
   char readingDay[11]{};

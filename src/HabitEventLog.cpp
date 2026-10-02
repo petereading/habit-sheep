@@ -213,13 +213,17 @@ uint16_t HabitEventLog::completionCountForWeek(const std::string& habitId) {
   int64_t ignoredEpoch = 0;
   if (!currentDay(day, ignoredEpoch)) return progressForToday(habitId).completionCount;
   if (day != cachedDay) refreshToday();
+  if (cachedWeekStart != HABIT_SHEEP.getWeekStart()) {
+    cachedWeekCounts.clear();
+    cachedWeekStart = HABIT_SHEEP.getWeekStart();
+  }
   const auto cached = std::find_if(cachedWeekCounts.begin(), cachedWeekCounts.end(),
                                    [&](const CachedWeekCount& item) { return item.habitId == habitId; });
   if (cached != cachedWeekCounts.end()) return cached->count;
 
   struct tm local{};
   if (!halClock.localTime(local)) return progressForToday(habitId).completionCount;
-  const int daysSinceMonday = (local.tm_wday + 6) % 7;
+  const int daysSinceMonday = (local.tm_wday + 7 - HABIT_SHEEP.getWeekStart()) % 7;
   uint16_t count = progressForToday(habitId).completionCount;
   for (int offset = 1; offset <= daysSinceMonday; ++offset) {
     struct tm previous = local;
@@ -235,7 +239,7 @@ uint16_t HabitEventLog::completionCountForWeek(const std::string& habitId) {
 
 bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, const uint32_t amount, const char* unit,
                                 const HabitEventSource source, const char* dayOverride) {
-  if (habitId.empty() || !type || !unit) return false;
+  if (!HABIT_SHEEP.isEnabled() || habitId.empty() || !type || !unit) return false;
 
   std::string today;
   int64_t epoch = 0;
@@ -303,11 +307,12 @@ bool HabitEventLog::appendCompletion(const std::string& habitId, const HabitEven
                                                               : progressForToday(habitId).completionCount;
   if (count >= habit->targetCount) return false;
   if (!appendEvent(habitId, "completion", 1, "completion", source)) return false;
-  const uint8_t weeklyBonus =
-      habit->period == HabitPeriod::Weekly && count + 1 == habit->targetCount && habit->targetCount < 7
-          ? static_cast<uint8_t>(7 - habit->targetCount)
-          : 0;
-  awardGrass(habitId, 1 + weeklyBonus);
+  // A weekly habit supplies a week's food, apportioned across its target.
+  // Each newly appended completion earns once; changing the week boundary never rewards old events.
+  const uint8_t reward = habit->period == HabitPeriod::Weekly && habit->targetCount < 7
+                             ? static_cast<uint8_t>(21 / habit->targetCount + (count < 21 % habit->targetCount ? 1 : 0))
+                             : 3;
+  awardGrass(habitId, reward);
   return true;
 }
 
@@ -319,7 +324,7 @@ bool HabitEventLog::appendDurationSeconds(const std::string& habitId, const uint
   if (!appendEvent(habitId, "duration", seconds, "seconds", source)) return false;
   if (habit && habit->type == HabitType::Duration && before < static_cast<uint32_t>(habit->targetMinutes) * 60 &&
       seconds >= static_cast<uint32_t>(habit->targetMinutes) * 60 - before)
-    awardGrass(habitId, 1);
+    awardGrass(habitId, 3);
   return true;
 }
 
@@ -335,14 +340,14 @@ bool HabitEventLog::appendDurationSecondsOnDay(const std::string& habitId, const
   if (!appendEvent(habitId, "duration", seconds, "seconds", source, day)) return false;
   if (habit && habit->type == HabitType::Duration && before < static_cast<uint32_t>(habit->targetMinutes) * 60 &&
       seconds >= static_cast<uint32_t>(habit->targetMinutes) * 60 - before)
-    awardGrass(habitId, 1, day);
+    awardGrass(habitId, 3, day);
   return true;
 }
 
 bool HabitEventLog::appendPomodoroFocus(const std::string& habitId, const uint32_t seconds) {
   if (seconds == 0) return false;
   if (!appendEvent(habitId, "pomodoro", seconds, "seconds", HabitEventSource::Timer)) return false;
-  awardGrass(habitId, 1);
+  awardGrass(habitId, 3);
   return true;
 }
 

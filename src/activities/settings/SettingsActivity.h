@@ -33,6 +33,9 @@ enum class SettingAction {
   ActiveHabits,
   HabitLibrary,
   GrassHistory,
+  HabitMode,
+  HabitWeekStart,
+  SheepMemory,
 };
 
 struct SettingInfo {

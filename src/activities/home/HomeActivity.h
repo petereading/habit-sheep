@@ -22,6 +22,7 @@ class HomeActivity final : public Activity {
   int selectorIndex = 0;
   uint32_t lastHabitProgressStamp = UINT32_MAX;
   HabitClock habitClock;
+  uint32_t lastHabitModeRevision = UINT32_MAX;
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;

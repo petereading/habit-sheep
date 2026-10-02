@@ -10,6 +10,7 @@
 
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
+#include "SheepStateStore.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
 #include "fontIds.h"
@@ -240,7 +241,8 @@ class OptionPopup {
       if (grassGain)
         snprintf(amount, sizeof(amount), "+%u", static_cast<unsigned>(grassGain));
       else
-        snprintf(amount, sizeof(amount), "%u/%u", static_cast<unsigned>(grassStock), 14U);
+        snprintf(amount, sizeof(amount), "%u / %u", static_cast<unsigned>(grassStock),
+                 static_cast<unsigned>(SheepStateStore::GRASS_CAP));
       const int amountW = renderer.getTextWidth(NOTOSANS_14_FONT_ID, amount);
       const int x = content.x + (content.width - amountW - 38) / 2;
       const int y = content.y + 2;

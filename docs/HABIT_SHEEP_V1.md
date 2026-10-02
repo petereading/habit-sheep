@@ -4,6 +4,7 @@ Habit Sheep is an e-ink habit companion and virtual sheep built as a thin fork o
 
 ## Product principles
 
+- Habit formation is the primary goal. The sheep provides feedback, companionship and optional entertainment; care and games must remain optional.
 - CrossPoint remains a reader. Habit Sheep must not make reading feel compulsory.
 - The sheep and habit system must be fully useful offline and without AI.
 - Positive reinforcement only: no starvation, illness, death, punishment, guilt, or grass debt for missed habits.
@@ -86,25 +87,25 @@ Touch devices:
 - Ordinary sheep interaction does not count as habit completion.
 - Habit completion replenishes the grass stock.
 - Sheep interaction contributes to relationship/bond.
-- Bond does not need a visible numeric score. It is expressed through behaviour, e.g. looking at the user, approaching, resting nearby, or running over when called.
+- Mood display uses up to five hearts. Mood and relationship remain distinct.
+- Bond is initially expressed through behaviour, e.g. looking at the user, approaching, resting nearby, or running over when called. Revisit the presentation after testing if these cues are not clear enough.
 - No penalty for not interacting.
 
 ## Sheep life and pasture
 
-Autonomous ambient behaviour such as sleeping, grazing, sitting, wandering, playing and approaching the user is planned for a later slice. The current firmware provides static sheep/foraging scenes and a small response to manual interaction.
+The functional firmware advances coarse daytime wandering and night/rest poses without continuous animation. Formal grazing, walking and return animation frames belong to the next artwork phase.
 
-Do not simulate continuously while the device is powered off. Persist the last state/time and advance coarse state from elapsed time on wake.
+Persist meal progress and advance coarse state on wake or while awake. Meals are at local 08:00, 13:00 and 19:00, each consuming one grass; no scheduled wake is introduced. Grass is the only resource, stock cap 21, fresh stock nine. Existing stock/history survive upgrade and establish a new meal baseline without retroactive charges. There are no coins or purchases, food debt, starvation or death.
 
-Grass is the only resource in V1. The sheep eats one grass per local calendar day. The stock holds at most 14 grass, begins at three, and never becomes negative. When empty, the sheep goes out to forage on its own and the pen shows a playful sign explaining that new grass brings it home. The next earned grass returns it immediately. It cannot starve or die. There are no coins, decoration purchases, or other collectible resources.
+- Valid daily count completions, duration/reading targets and Pomodoro focuses earn +3. Weekly count goals below seven apportion 21 across target completions; goals with seven or more earn +3 per completion. Full stock still records the habit, with an honest positive notice.
+- Mood uses five hearts. Eating restores one, up to five; a completely empty local day costs one. A missed meal shows rest; zero mood means foraging. Replenishment returns the sheep, consuming at most one of the day's three meal slots immediately if available.
+- Optional hello or a completed Sheep pairs game improves relationship at most once daily. Relationship is expressed through position and response. Completely empty days gently reduce bond while mood remains positive. Games never create grass or log a habit.
+- The 14-day grass ledger records actual gains and consumption and marks paused dates. It is an aggregate tracker, not individual habit statistics.
+- Week starts on is configurable for all seven weekdays, default Monday. Boundary changes recalculate progress without rewriting or rewarding historical events.
+- Habit mode Off freezes care and recording, preserves paused timer elapsed time, and resumes without catch-up deductions. Home becomes a recent-book cover/title tile with the reader dock. It sets the real Display Cover sleep choice temporarily and restores the remembered choice unless the user changes it explicitly while paused.
+- Sheep pairs is a short four-pair memory game with button/touch input, acknowledged mismatches, immediate Back exit, no coins or XP, and no timed animation.
 
-- Each valid completion of a daily or weekly count habit earns one grass, up to the configured target count. A weekly goal earns enough extra grass at its final completion to provide at least seven in total for the week.
-- Reaching a duration habit's daily target earns one grass, once for that habit and day. Finishing each Pomodoro focus session earns one; breaks and partial sessions do not.
-- The visible grass represents the current stock, not lifetime earnings. The completion message shows the amount actually added; when the stock is full it says so instead of claiming an award.
-- Habit Sheep Settings includes a 14-day grass history with the grass earned and eaten per local day. Days before this rule is installed have no fabricated history.
-- Feeding is settled once per calendar day when the device next wakes or opens Home. Missed days consume only available stock, with no debt. If the clock is unavailable, feeding waits for a valid local date.
-- Existing V1 pasture points are converted into a starting stock without clearing saved habits or event logs.
-
-Short optional e-ink-friendly interactions/minigames may be added without coins, XP, daily quests, leaderboards, or endless loops.
+See `HABIT_SHEEP_PENDING.md` for the functional X3 checklist. Formal artwork starts after this firmware passes hardware testing.
 
 ## Sleep screen
 

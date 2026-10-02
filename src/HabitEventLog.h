@@ -47,6 +47,7 @@ class HabitEventLog {
   };
 
   std::string cachedDay;
+  uint8_t cachedWeekStart = 255;
   std::vector<CachedProgress> cachedProgress;
   std::vector<CachedWeekCount> cachedWeekCounts;
   std::array<RewardNotice, HabitSheepStore::MAX_HABITS> pendingRewards{};

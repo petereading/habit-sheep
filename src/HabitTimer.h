@@ -17,6 +17,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
 
   bool start(const std::string& habitId);
   bool pause(const std::string& habitId);
+  bool pauseAll();
   bool resume(const std::string& habitId);
   bool skipShortBreak(const std::string& habitId);
   uint32_t stopAndLog(const std::string& habitId);

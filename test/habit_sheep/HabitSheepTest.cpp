@@ -7,6 +7,7 @@
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
+#include "SheepMemoryGame.h"
 #include "SheepStateStore.h"
 #include "components/HabitClock.h"
 
@@ -29,7 +30,9 @@ class HabitSheepTest : public ::testing::Test {
   void advance(unsigned long seconds) { habitTestMillis += seconds * 1000; }
   void stock(uint8_t amount = 3, uint32_t lastDay = 20261001) {
     JsonDocument doc;
-    doc["schema"] = 3;
+    doc["schema"] = 4;
+    doc["mealsProcessed"] = 1;
+    doc["eatenToday"] = 1;
     doc["grassStock"] = amount;
     doc["lastFedDay"] = lastDay;
     ASSERT_TRUE(SHEEP_STATE.fromJson(doc));
@@ -74,10 +77,10 @@ TEST_F(HabitSheepTest, SkipShortBreakStartsFocusWithoutDuplicateReward) {
   HABIT_TIMER.tick();
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::ShortBreak);
   EXPECT_FALSE(HABIT_TIMER.isRunning());
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 4);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 6);
   HabitEventLog::RewardNotice notice;
   ASSERT_TRUE(HABIT_EVENTS.takeReward(notice));
-  EXPECT_EQ(notice.grass, 1);
+  EXPECT_EQ(notice.grass, 3);
   ASSERT_TRUE(HABIT_TIMER.skipShortBreak("pomodoro"));
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::Focus);
   EXPECT_TRUE(HABIT_TIMER.isRunning());
@@ -102,7 +105,7 @@ TEST_F(HabitSheepTest, CanSkipRunningShortBreakAndResumeSavedFocusManually) {
   ASSERT_TRUE(HABIT_TIMER.fromJson(saved));
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::Focus);
   EXPECT_FALSE(HABIT_TIMER.isRunning());
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 4);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 6);
   ASSERT_TRUE(HABIT_TIMER.resume("pomodoro"));
 }
 
@@ -128,16 +131,16 @@ TEST_F(HabitSheepTest, DurationTargetAwardsWhileRunningOnlyOnce) {
   advance(60);
   HABIT_TIMER.tick();
   EXPECT_EQ(HABIT_EVENTS.progressForToday("duration").durationSeconds, 60);
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 4);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 6);
   EXPECT_TRUE(HABIT_TIMER.isRunning());
   HabitEventLog::RewardNotice notice;
   ASSERT_TRUE(HABIT_EVENTS.takeReward(notice));
-  EXPECT_EQ(notice.grass, 1);
+  EXPECT_EQ(notice.grass, 3);
   advance(60);
   HABIT_TIMER.tick();
   HABIT_TIMER.stopAndLog("duration");
   EXPECT_EQ(HABIT_EVENTS.progressForToday("duration").durationSeconds, 120);
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 4);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 6);
   EXPECT_FALSE(HABIT_EVENTS.takeReward(notice));
 }
 
@@ -146,7 +149,7 @@ TEST_F(HabitSheepTest, PastReadingDayCreditsHistoryAndDoesNotRewardAgain) {
   ASSERT_TRUE(HABIT_EVENTS.appendDurationSecondsOnDay("duration", 30, "2026-10-01"));
   EXPECT_EQ(SHEEP_STATE.getGrassStock(), 3);
   ASSERT_TRUE(HABIT_EVENTS.appendDurationSecondsOnDay("duration", 30, "2026-10-01"));
-  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 1);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 3);
   EXPECT_EQ(HABIT_EVENTS.progressForToday("duration").durationSeconds, 0);
   HabitEventLog::RewardNotice notice;
   ASSERT_TRUE(HABIT_EVENTS.takeReward(notice));
@@ -155,24 +158,24 @@ TEST_F(HabitSheepTest, PastReadingDayCreditsHistoryAndDoesNotRewardAgain) {
 }
 
 TEST_F(HabitSheepTest, FullStockStillLogsCompletionAndZeroGainNotice) {
-  stock(14);
+  stock(21);
   ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
   EXPECT_EQ(HABIT_EVENTS.progressForToday("completion").completionCount, 1);
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 14);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
   HabitEventLog::RewardNotice notice;
   ASSERT_TRUE(HABIT_EVENTS.takeReward(notice));
   EXPECT_EQ(notice.grass, 0);
   EXPECT_FALSE(HABIT_EVENTS.appendCompletion("completion"));
 }
 
-TEST_F(HabitSheepTest, WeeklyThreeCompletionsReplenishSevenGrass) {
+TEST_F(HabitSheepTest, WeeklyThreeCompletionsReplenishTwentyOneGrass) {
   auto habit = *HABIT_SHEEP.findHabit("completion");
   habit.period = HabitPeriod::Weekly;
   habit.targetCount = 3;
   ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
   for (int i = 0; i < 3; ++i) ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 10);
-  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 7);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 18);
   EXPECT_FALSE(HABIT_EVENTS.appendCompletion("completion"));
 }
 
@@ -182,11 +185,12 @@ TEST_F(HabitSheepTest, OfflineFeedingHasNoDebtAndReplenishmentReturnsSheep) {
   ASSERT_TRUE(SHEEP_STATE.settleDay());
   EXPECT_EQ(SHEEP_STATE.getGrassStock(), 0);
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261002).eaten, 1);
-  EXPECT_EQ(SHEEP_STATE.grassForDay(20261004).eaten, 1);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261004).eaten, 0);
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261005).eaten, 0);
   EXPECT_FALSE(SHEEP_STATE.settleDay());
   EXPECT_EQ(SHEEP_STATE.addGrass(1), 1);
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 1);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 0);
+  EXPECT_FALSE(SHEEP_STATE.isForaging());
   EXPECT_FALSE(SHEEP_STATE.settleDay());
   date(21);
   ASSERT_TRUE(SHEEP_STATE.settleDay());
@@ -199,28 +203,28 @@ TEST_F(HabitSheepTest, MigrationClampsPastureAndDoesNotInventHistory) {
   old["pasturePoints"] = 10000;
   old["bondPoints"] = 42;
   ASSERT_TRUE(SHEEP_STATE.fromJson(old));
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 14);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
   EXPECT_EQ(SHEEP_STATE.getBondPoints(), 42);
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).day, 0);
   ASSERT_TRUE(SHEEP_STATE.settleDay());
-  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 14);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
 }
 
 TEST_F(HabitSheepTest, LedgerKeepsNewestFourteenDaysAndSurvivesJsonRoundTrip) {
   for (int i = 1; i <= 16; ++i) {
     date(i);
-    SHEEP_STATE.addGrass(1);
+    SHEEP_STATE.addGrass(3);
   }
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).day, 0);
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261002).day, 0);
-  EXPECT_EQ(SHEEP_STATE.grassForDay(20261003).earned, 1);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261003).earned, 3);
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261016).eaten, 1);
   JsonDocument saved;
   SHEEP_STATE.toJson(saved);
   ASSERT_TRUE(SHEEP_STATE.fromJson(saved));
-  EXPECT_EQ(SHEEP_STATE.grassForDay(20261016).earned, 1);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261016).earned, 3);
   SHEEP_STATE.addGrass(1, "2026-10-01");
-  EXPECT_EQ(SHEEP_STATE.grassForDay(20261003).earned, 1);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261003).earned, 3);
 }
 
 TEST_F(HabitSheepTest, ClockRefreshesOnlyWhenCalendarMinuteChanges) {
@@ -237,4 +241,196 @@ TEST_F(HabitSheepTest, ClockRefreshesOnlyWhenCalendarMinuteChanges) {
   halClock.available = false;
   EXPECT_TRUE(clock.changed());
   EXPECT_FALSE(clock.changed());
+}
+
+TEST_F(HabitSheepTest, ThreeMealsUseLocalBoundariesExactlyOnceAcrossRestart) {
+  stock(21);
+  halClock.now.tm_hour = 12;
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  halClock.now.tm_hour = 13;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 20);
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  JsonDocument saved;
+  SHEEP_STATE.toJson(saved);
+  ASSERT_TRUE(SHEEP_STATE.fromJson(saved));
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  halClock.now.tm_hour = 19;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 19);
+  date(2);
+  halClock.now.tm_hour = 7;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 19);
+  halClock.now.tm_hour = 8;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 18);
+}
+
+TEST_F(HabitSheepTest, OneMissedMealRestsAndOnlyAnEntireEmptyDayCostsOneHeart) {
+  stock(0);
+  halClock.now.tm_hour = 19;
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_TRUE(SHEEP_STATE.isResting());
+  EXPECT_EQ(SHEEP_STATE.getMood(), 5);
+  date(2);
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getMood(), 5);  // Breakfast on day one was already eaten.
+  date(3);
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getMood(), 4);
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  date(20);
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getMood(), 0);
+  EXPECT_TRUE(SHEEP_STATE.isForaging());
+  SHEEP_STATE.addGrass(3);
+  EXPECT_FALSE(SHEEP_STATE.isForaging());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 2);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261020).eaten, 1);
+  halClock.now.tm_hour = 19;
+  SHEEP_STATE.settleDay();
+  EXPECT_LE(SHEEP_STATE.grassForDay(20261020).eaten, 3);
+}
+
+TEST_F(HabitSheepTest, PauseFreezesTimersCareAndRewardsWithNoCatchup) {
+  stock(21);
+  ASSERT_TRUE(HABIT_TIMER.start("duration"));
+  advance(20);
+  ASSERT_TRUE(HABIT_SHEEP.setEnabled(false));
+  EXPECT_FALSE(HABIT_TIMER.isRunning());
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("duration"), 20);
+  date(25);
+  advance(3600);
+  SHEEP_STATE.settleDay();
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  EXPECT_EQ(SHEEP_STATE.getMood(), 5);
+  EXPECT_FALSE(HABIT_EVENTS.appendCompletion("completion"));
+  EXPECT_FALSE(HABIT_EVENTS.appendDurationSecondsOnDay("duration", 60, "2026-10-01"));
+  EXPECT_FALSE(HABIT_TIMER.start("pomodoro"));
+  EXPECT_FALSE(HABIT_TIMER.resume("duration"));
+  ASSERT_TRUE(HABIT_SHEEP.setEnabled(true));
+  EXPECT_TRUE(SHEEP_STATE.grassForDay(20261024).paused);
+  EXPECT_FALSE(HABIT_TIMER.isRunning());
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  ASSERT_TRUE(HABIT_TIMER.resume("duration"));
+  advance(40);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("duration").durationSeconds, 60);
+}
+
+TEST_F(HabitSheepTest, WeekStartChangesCountsWithoutAwardingOldEvents) {
+  auto habit = *HABIT_SHEEP.findHabit("completion");
+  habit.period = HabitPeriod::Weekly;
+  habit.targetCount = 7;
+  ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+  date(4);  // Sunday
+  ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
+  date(5);  // Monday
+  EXPECT_EQ(HABIT_EVENTS.completionCountForWeek("completion"), 0);
+  const auto grass = SHEEP_STATE.getGrassStock();
+  ASSERT_TRUE(HABIT_SHEEP.setWeekStart(0));
+  EXPECT_EQ(HABIT_EVENTS.completionCountForWeek("completion"), 1);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), grass);
+  ASSERT_TRUE(HABIT_SHEEP.setWeekStart(1));
+  EXPECT_EQ(HABIT_EVENTS.completionCountForWeek("completion"), 0);
+  EXPECT_FALSE(HABIT_SHEEP.setWeekStart(7));
+}
+
+TEST_F(HabitSheepTest, ClockUnavailableAndBackwardCorrectionsDoNotFeedTwice) {
+  stock(21);
+  halClock.available = false;
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  halClock.available = true;
+  halClock.now.tm_hour = 19;
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 19);
+  halClock.now.tm_hour = 8;
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  date(0);
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  date(1);
+  halClock.now.tm_hour = 19;
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 19);
+}
+
+TEST_F(HabitSheepTest, InteractionImprovesBondAtMostOnceDailyAndNeverCreatesFood) {
+  const auto grass = SHEEP_STATE.getGrassStock();
+  SHEEP_STATE.recordInteraction();
+  SHEEP_STATE.recordInteraction();
+  EXPECT_EQ(SHEEP_STATE.getBondPoints(), 1);
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), grass);
+  date(2);
+  SHEEP_STATE.recordInteraction();
+  EXPECT_EQ(SHEEP_STATE.getBondPoints(), 2);
+}
+
+TEST_F(HabitSheepTest, MemoryGameKeepsMissVisibleUntilAcknowledgedAndFinishesFourPairs) {
+  SheepMemoryGame game;
+  game.reset(42);
+  int counts[4]{};
+  for (int i = 0; i < 8; ++i) ++counts[game.value(i)];
+  for (int count : counts) EXPECT_EQ(count, 2);
+  int different = 1;
+  while (game.value(different) == game.value(0)) ++different;
+  EXPECT_EQ(game.reveal(0), SheepMemoryGame::Result::Revealed);
+  EXPECT_EQ(game.reveal(different), SheepMemoryGame::Result::Miss);
+  EXPECT_TRUE(game.shown(0));
+  EXPECT_TRUE(game.shown(different));
+  EXPECT_EQ(game.reveal(7), SheepMemoryGame::Result::Ignored);
+  game.hideMiss();
+  EXPECT_FALSE(game.shown(0));
+  for (int value = 0; value < 4; ++value) {
+    for (int i = 0; i < 8; ++i)
+      if (game.value(i) == value) game.reveal(i);
+  }
+  EXPECT_TRUE(game.complete());
+  EXPECT_EQ(game.reveal(0), SheepMemoryGame::Result::Ignored);
+}
+
+TEST_F(HabitSheepTest, FailedStateSaveRetriesOneMealWithoutDoubleConsumption) {
+  stock(21);
+  halClock.now.tm_hour = 13;
+  habitTestSaveFailure = true;
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).eaten, 0);
+  habitTestSaveFailure = false;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 20);
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).eaten, 1);
+}
+
+TEST_F(HabitSheepTest, FailedPauseSaveLeavesModeEnabledAndTimerRunning) {
+  ASSERT_TRUE(HABIT_TIMER.start("duration"));
+  advance(10);
+  habitTestSaveFailure = true;
+  EXPECT_FALSE(HABIT_SHEEP.setEnabled(false));
+  EXPECT_TRUE(HABIT_SHEEP.isEnabled());
+  EXPECT_TRUE(HABIT_TIMER.isRunning());
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("duration"), 10);
+}
+
+TEST_F(HabitSheepTest, CorrectingAnRtcFarInTheFutureRebasesWithoutRetroactiveCharges) {
+  stock(21, 20271001);
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  halClock.now.tm_hour = 13;
+  ASSERT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 20);
+}
+
+TEST_F(HabitSheepTest, WeeklyFourCompletionsApportionExactlyTwentyOneGrass) {
+  stock(0);
+  auto habit = *HABIT_SHEEP.findHabit("completion");
+  habit.period = HabitPeriod::Weekly;
+  habit.targetCount = 4;
+  ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+  for (int i = 0; i < 4; ++i) ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 21);
 }

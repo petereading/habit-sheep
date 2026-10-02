@@ -83,6 +83,7 @@ void ReaderActivity::onEnter() {
   readingTimeTracked = std::any_of(
       HABIT_SHEEP.getHabits().begin(), HABIT_SHEEP.getHabits().end(),
       [](const HabitDefinition& habit) { return habit.type == HabitType::Duration && habit.readingIntegration; });
+  readingModeRevision = HABIT_SHEEP.getModeRevision();
   if (readingTimeTracked) {
     readingLastRecordedMs = millis();
     readingLastCheckMs = readingLastRecordedMs;
@@ -123,6 +124,13 @@ void ReaderActivity::onExit() {
 
 void ReaderActivity::recordReadingTime(const bool force) {
   if (!readingTimeTracked) return;
+  if (!HABIT_SHEEP.isEnabled() || readingModeRevision != HABIT_SHEEP.getModeRevision()) {
+    readingModeRevision = HABIT_SHEEP.getModeRevision();
+    readingLastRecordedMs = millis();
+    readingLastCheckMs = readingLastRecordedMs;
+    readingDay[0] = '\0';
+    return;
+  }
   const unsigned long now = millis();
   if (!force && now - readingLastCheckMs < 1000) return;
   readingLastCheckMs = now;

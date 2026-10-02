@@ -19,6 +19,7 @@
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
+#include "HabitSheepMode.h"
 #include "HabitSheepStore.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
@@ -1304,6 +1305,8 @@ void CrossPointWebServer::handlePostSettings() {
         if (val >= 0 && val < maxVal) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+            if (s.valuePtr == &CrossPointSettings::sleepScreen && !HABIT_SHEEP.isEnabled())
+              HABIT_SHEEP.clearPausedSleepScreen();
           } else if (s.valueSetter) {
             s.valueSetter(static_cast<uint8_t>(val));
           }
@@ -1316,6 +1319,8 @@ void CrossPointWebServer::handlePostSettings() {
         if (val >= s.valueRange.min && val <= s.valueRange.max) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+            if (s.valuePtr == &CrossPointSettings::sleepScreen && !HABIT_SHEEP.isEnabled())
+              HABIT_SHEEP.clearPausedSleepScreen();
           }
           applied++;
         }
@@ -1413,6 +1418,11 @@ void CrossPointWebServer::handlePostHabitSheep() {
     if (slot >= 0 && slot < static_cast<int>(HabitSheepStore::MAX_ACTIVE_HABITS)) {
       valid = HABIT_SHEEP.setActiveHabit(static_cast<size_t>(slot), id);
     }
+  } else if (strcmp(action, "setEnabled") == 0) {
+    if (doc["enabled"].is<bool>()) valid = setHabitSheepEnabled(doc["enabled"].as<bool>());
+  } else if (strcmp(action, "setWeekStart") == 0) {
+    const int value = doc["weekStart"] | -1;
+    if (value >= 0 && value <= 6) valid = HABIT_SHEEP.setWeekStart(value);
   } else if (strcmp(action, "setSheepName") == 0) {
     const char* name = doc["name"] | "";
     if (strlen(name) <= HabitSheepStore::MAX_NAME_BYTES) valid = HABIT_SHEEP.setSheepName(name);

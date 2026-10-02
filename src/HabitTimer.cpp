@@ -73,6 +73,7 @@ HabitTimer::Phase HabitTimer::phaseFor(const std::string& id) const {
 }
 
 bool HabitTimer::start(const std::string& id) {
+  if (!HABIT_SHEEP.isEnabled()) return false;
   if (id.empty() || find(id) || isRunning() || !HABIT_SHEEP.findHabit(id)) return false;
   for (auto& session : sessions) {
     if (!session.habitId.empty()) continue;
@@ -95,6 +96,7 @@ bool HabitTimer::pause(const std::string& id) {
 }
 
 bool HabitTimer::resume(const std::string& id) {
+  if (!HABIT_SHEEP.isEnabled()) return false;
   Session* session = find(id);
   if (!session || session->running || isRunning()) return false;
   session->startedAtMs = millis();
@@ -117,6 +119,7 @@ uint32_t HabitTimer::stopAndLog(const std::string& id) {
 }
 
 bool HabitTimer::skipShortBreak(const std::string& id) {
+  if (!HABIT_SHEEP.isEnabled()) return false;
   Session* session = find(id);
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(id);
   if (!session || !habit || habit->type != HabitType::Pomodoro || session->phase != Phase::ShortBreak ||
@@ -137,6 +140,7 @@ bool HabitTimer::skipShortBreak(const std::string& id) {
 }
 
 void HabitTimer::tick() {
+  if (!HABIT_SHEEP.isEnabled()) return;
   for (auto& session : sessions) {
     if (session.habitId.empty()) continue;
     const HabitDefinition* habit = HABIT_SHEEP.findHabit(session.habitId);
@@ -232,4 +236,21 @@ bool HabitTimer::fromJson(JsonVariantConst doc) {
     // The persisted elapsed value can be resumed explicitly by the user.
   }
   return true;
+}
+
+bool HabitTimer::pauseAll() {
+  Session* running = nullptr;
+  uint32_t previousMs = 0;
+  for (auto& session : sessions) {
+    if (!session.running) continue;
+    running = &session;
+    previousMs = session.accumulatedMs;
+    session.accumulatedMs = elapsedMs(session);
+    session.running = false;
+    break;
+  }
+  if (!running || saveToFile()) return true;
+  running->accumulatedMs = previousMs;
+  running->running = true;
+  return false;
 }

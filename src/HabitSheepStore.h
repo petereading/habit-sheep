@@ -36,6 +36,10 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   std::vector<HabitDefinition> habits;
   std::array<std::string, MAX_ACTIVE_HABITS> activeHabitIds{};
   bool sleepSceneEnabled = true;
+  bool enabled = true;
+  uint32_t modeRevision = 0;
+  uint8_t weekStart = 1;
+  uint8_t pausedSleepScreen = 255;
 
   HabitSheepStore();
   ~HabitSheepStore() = default;
@@ -56,6 +60,13 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   const std::string& getSheepName() const { return sheepName; }
   const std::vector<HabitDefinition>& getHabits() const { return habits; }
   const std::array<std::string, MAX_ACTIVE_HABITS>& getActiveHabitIds() const { return activeHabitIds; }
+  uint32_t getModeRevision() const { return modeRevision; }
+  bool clearPausedSleepScreen();
+  bool isEnabled() const { return enabled; }
+  uint8_t getWeekStart() const { return weekStart; }
+  uint8_t getPausedSleepScreen() const { return pausedSleepScreen; }
+  bool setEnabled(bool value, uint8_t sleepScreen = 255);
+  bool setWeekStart(uint8_t value);
   bool legacySleepSceneEnabled() const { return sleepSceneEnabled; }
 
   const HabitDefinition* findHabit(const std::string& id) const;

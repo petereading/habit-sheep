@@ -618,6 +618,11 @@ void loop() {
   }
 
   HABIT_TIMER.tick();
+  static unsigned long lastSheepCheckMs = 0;
+  if (millis() - lastSheepCheckMs >= 60000) {
+    lastSheepCheckMs = millis();
+    SHEEP_STATE.settleDay();
+  }
 
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 

@@ -1,11 +1,14 @@
 #include "SheepStateStore.h"
 
 #include <HalClock.h>
+#include <Logging.h>
 
 #include <algorithm>
 #include <climits>
 #include <cstdio>
 #include <ctime>
+
+#include "HabitSheepStore.h"
 
 namespace {
 uint32_t dayKey(const tm& local) {
@@ -43,7 +46,13 @@ bool nextDay(uint32_t day, uint32_t& next) {
 }  // namespace
 
 void SheepStateStore::toJson(JsonDocument& doc) const {
-  doc["schema"] = 3;
+  doc["schema"] = 4;
+  doc["mood"] = mood;
+  doc["mealsProcessed"] = mealsProcessed;
+  doc["eatenToday"] = eatenToday;
+  doc["missedMeal"] = missedMeal;
+  doc["paused"] = paused;
+  doc["lastInteractionDay"] = lastInteractionDay;
   doc["bondPoints"] = bondPoints;
   doc["grassStock"] = grassStock;
   doc["lastFedDay"] = lastFedDay;
@@ -54,30 +63,38 @@ void SheepStateStore::toJson(JsonDocument& doc) const {
     row["d"] = entry.day;
     row["g"] = entry.earned;
     row["e"] = entry.eaten;
+    row["p"] = entry.paused;
   }
 }
 
 bool SheepStateStore::fromJson(JsonVariantConst doc) {
   bondPoints = doc["bondPoints"] | static_cast<uint32_t>(0);
-  grassDays.fill(GrassDay{});
+  grassDays = {};
+  mood = std::min<uint8_t>(5, doc["mood"] | static_cast<uint8_t>(5));
+  mealsProcessed = std::min<uint8_t>(3, doc["mealsProcessed"] | static_cast<uint8_t>(0));
+  eatenToday = std::min<uint8_t>(3, doc["eatenToday"] | static_cast<uint8_t>(0));
+  missedMeal = doc["missedMeal"] | false;
+  paused = doc["paused"] | !HABIT_SHEEP.isEnabled();
+  lastInteractionDay = doc["lastInteractionDay"] | static_cast<uint32_t>(0);
   const uint8_t schema = doc["schema"] | static_cast<uint8_t>(1);
   if (schema < 3) {
-    // Preserve at least the legacy visible pasture, and give existing beta
-    // users the same three-day starting buffer as a fresh installation.
+    // Preserve legacy pasture with a three-day starting buffer.
     const uint32_t pasture = doc["pasturePoints"] | static_cast<uint32_t>(0);
-    grassStock = static_cast<uint8_t>(std::min<uint32_t>(GRASS_CAP, std::max<uint32_t>(3, pasture / 20)));
+    grassStock = static_cast<uint8_t>(std::min<uint32_t>(GRASS_CAP, std::max<uint32_t>(9, pasture / 20)));
     lastFedDay = 0;
     requestResave();
     return true;
   }
-  grassStock = std::min<uint8_t>(doc["grassStock"] | static_cast<uint8_t>(3), GRASS_CAP);
-  lastFedDay = doc["lastFedDay"] | static_cast<uint32_t>(0);
+  grassStock = std::min<uint8_t>(doc["grassStock"] | static_cast<uint8_t>(9), GRASS_CAP);
+  lastFedDay = schema >= 4 ? (doc["lastFedDay"] | static_cast<uint32_t>(0)) : 0;
+  if (schema < 4) requestResave();
   for (JsonObjectConst row : doc["grassDays"].as<JsonArrayConst>()) {
     const uint32_t day = row["d"] | static_cast<uint32_t>(0);
     if (day < 20200101) continue;
     GrassDay& entry = entryForDay(day);
     entry.earned = row["g"] | static_cast<uint8_t>(0);
     entry.eaten = row["e"] | static_cast<uint8_t>(0);
+    entry.paused = row["p"] | false;
   }
   return true;
 }
@@ -101,42 +118,98 @@ SheepStateStore::GrassDay SheepStateStore::grassForDay(const uint32_t day) const
   return {};
 }
 
-bool SheepStateStore::settleDay() {
-  uint32_t today = 0;
-  if (!currentDay(today)) return false;
-  if (lastFedDay == today) return false;
-  if (lastFedDay == 0 || lastFedDay < 20200101 || lastFedDay > today) {
-    // A clock or timezone correction must not make the sheep wait for a
-    // previously recorded future date before it can eat again.
-    lastFedDay = today;
-    saveToFile();
-    return true;
+bool SheepStateStore::syncPause() {
+  const auto previous = snapshot();
+  tm local{};
+  if (!halClock.isAvailable() || !halClock.localTime(local)) {
+    paused = !HABIT_SHEEP.isEnabled();
+    lastFedDay = 0;
+    return persistOrRestore(previous);
   }
-
-  uint32_t day = lastFedDay;
-  while (day < today && grassStock > 0) {
-    uint32_t next = 0;
-    if (!nextDay(day, next) || next > today) break;
-    day = next;
-    --grassStock;
-    GrassDay& entry = entryForDay(day);
-    if (entry.eaten < UINT8_MAX) ++entry.eaten;
+  const uint32_t today = dayKey(local);
+  markPausedDays(local);
+  const uint8_t due = (local.tm_hour >= 8) + (local.tm_hour >= 13) + (local.tm_hour >= 19);
+  if (lastFedDay != today) {
+    eatenToday = 0;
+    mealsProcessed = due;
+  } else {
+    mealsProcessed = std::max(mealsProcessed, due);
   }
-  // With no grass left, the sheep forages on its own. Never accrue a debt.
   lastFedDay = today;
-  saveToFile();
-  return true;
+  paused = !HABIT_SHEEP.isEnabled();
+  if (paused) entryForDay(today).paused = true;
+  missedMeal = false;
+  return persistOrRestore(previous);
+}
+
+bool SheepStateStore::settleDay() {
+  tm local{};
+  if (!halClock.isAvailable() || !halClock.localTime(local)) return false;
+  const uint32_t today = dayKey(local);
+  const uint8_t due = (local.tm_hour >= 8) + (local.tm_hour >= 13) + (local.tm_hour >= 19);
+  if (paused != !HABIT_SHEEP.isEnabled() || !lastFedDay) {
+    return syncPause();
+  }
+  // Ignore backward clock corrections rather than consuming the same meal twice.
+  if (today < lastFedDay) {
+    uint32_t tomorrow = 0;
+    // Small timezone/clock adjustments keep the meal cursor; a badly set RTC rebases without charges.
+    if (nextDay(today, tomorrow) && tomorrow < lastFedDay) return syncPause();
+    return false;
+  }
+  if (paused) {
+    if (today == lastFedDay) return false;
+    return syncPause();
+  }
+  if (today == lastFedDay && due <= mealsProcessed) return false;
+  const auto previous = snapshot();
+  while (lastFedDay <= today) {
+    const uint8_t limit = lastFedDay == today ? due : 3;
+    while (mealsProcessed < limit) {
+      ++mealsProcessed;
+      if (grassStock) {
+        --grassStock;
+        ++eatenToday;
+        ++entryForDay(lastFedDay).eaten;
+        mood = std::min<uint8_t>(5, mood + 1);
+        missedMeal = false;
+      } else {
+        missedMeal = true;
+      }
+    }
+    if (lastFedDay == today) break;
+    if (!eatenToday && mood && !grassForDay(lastFedDay).paused) {
+      --mood;
+      if (bondPoints) --bondPoints;
+    }
+    uint32_t next = 0;
+    if (!nextDay(lastFedDay, next)) break;
+    lastFedDay = next;
+    mealsProcessed = 0;
+    eatenToday = 0;
+    // With no food and no hearts there is no further debt to settle.
+    // At most seven fed days and five empty days need individual settlement.
+    if (!mood && lastFedDay < today) lastFedDay = today;
+  }
+  return persistOrRestore(previous);
 }
 
 void SheepStateStore::recordInteraction() {
+  if (!HABIT_SHEEP.isEnabled() || isForaging()) return;
+  uint32_t today = 0;
+  if (!currentDay(today) || today == lastInteractionDay) return;
+  const auto previous = snapshot();
+  lastInteractionDay = today;
   if (bondPoints < UINT32_MAX) ++bondPoints;
-  saveToFile();
+  persistOrRestore(previous);
 }
 
 uint8_t SheepStateStore::addGrass(const uint8_t amount, const char* eventDay) {
+  if (!HABIT_SHEEP.isEnabled()) return 0;
   settleDay();
   const uint8_t earned = std::min<uint8_t>(amount, GRASS_CAP - grassStock);
   if (!earned) return 0;
+  const auto previous = snapshot();
   grassStock += earned;
   uint32_t day = parseDay(eventDay);
   if (!day) currentDay(day);
@@ -150,6 +223,55 @@ uint8_t SheepStateStore::addGrass(const uint8_t amount, const char* eventDay) {
       entry.earned = static_cast<uint8_t>(std::min<int>(UINT8_MAX, entry.earned + earned));
     }
   }
-  saveToFile();
-  return earned;
+  if (!mood) {
+    // The returning sheep shares one of today's meal slots, never a fourth meal.
+    mood = 1;
+    if (mealsProcessed < 3) {
+      ++mealsProcessed;
+      --grassStock;
+      ++eatenToday;
+      if (currentDay(day)) ++entryForDay(day).eaten;
+      mood = 2;
+    }
+    missedMeal = false;
+  }
+  return persistOrRestore(previous) ? earned : 0;
+}
+
+SheepStateStore::Snapshot SheepStateStore::snapshot() const {
+  return {grassDays, bondPoints,     lastFedDay, lastInteractionDay, grassStock,
+          mood,      mealsProcessed, eatenToday, missedMeal,         paused};
+}
+
+bool SheepStateStore::persistOrRestore(const Snapshot& previous) {
+  if (saveToFile()) return true;
+  grassDays = previous.days;
+  bondPoints = previous.bond;
+  lastFedDay = previous.fedDay;
+  lastInteractionDay = previous.interactionDay;
+  grassStock = previous.stock;
+  mood = previous.mood;
+  mealsProcessed = previous.meals;
+  eatenToday = previous.eaten;
+  missedMeal = previous.missed;
+  paused = previous.paused;
+  LOG_ERR("HABIT", "Cannot save sheep state");
+  return false;
+}
+
+void SheepStateStore::markPausedDays(const tm& local) {
+  const uint32_t today = dayKey(local);
+  // Mark only the latest fourteen dates; a long holiday never causes an unbounded loop.
+  if (paused && lastFedDay && lastFedDay <= today) {
+    for (int offset = 0; offset < 14; ++offset) {
+      tm day = local;
+      day.tm_mday -= offset;
+      day.tm_hour = 12;
+      day.tm_isdst = -1;
+      mktime(&day);
+      const uint32_t key = dayKey(day);
+      if (key < lastFedDay) break;
+      entryForDay(key).paused = true;
+    }
+  }
 }

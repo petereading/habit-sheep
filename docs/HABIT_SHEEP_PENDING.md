@@ -8,8 +8,8 @@ The user approved items 1–7 and the uniform `min` abbreviation. These changes 
 2. **Awake clock:** Home and individual habit timer screens show the existing local device clock and time-format preference. Refresh when the minute changes, including while paused. Omit unavailable time. No minute wakeups or live clock on the static sheep sleep scene.
 3. **Sleep selection:** Display → Sleep Screen includes Habit Sheep alongside Cover and the existing modes. Remove the separate sheep toggle from device and web settings. Migrate the effective legacy choice once, preserving Quick Resume. Its existing timeout behaviour remains unchanged.
 4. **14-day grass history:** Settings → Habit Sheep → Grass history shows seven dates per page, with grass actually earned and eaten. Earlier dates without stored entries show a dash. This is an aggregate grass ledger, not individual habit statistics.
-5. **Consumable grass:** Stock begins at three, holds at most 14, and decreases by one per local calendar day when the device next settles its state. Offline elapsed days use only available stock. Unavailable clock pauses feeding; no debt or death.
-6. **Foraging scene:** An empty pen shows a playful foraging sign. New grass immediately returns the sheep. Autonomous movement, eating animation and relationship decline remain deferred.
+5. **Consumable grass:** Stock and feeding now follow the three-meal functional slice below. Offline elapsed days use only available stock. Unavailable clock pauses feeding; no debt or death.
+6. **Foraging scene:** At zero mood, the pen shows a playful foraging sign. New grass returns the sheep. Formal animation remains deferred.
 7. **Completion notice:** Completion counts, duration/reading targets and completed Pomodoro focus sessions show a positive notice with a grass symbol and the actual reward. Full stock still records completion and shows a positive full-stock notice. Duration timers keep running after the target checkpoint. Reader notices wait until Home so they do not interrupt a book.
 
 All abbreviated timer units remain `min`, irrespective of the number.
@@ -23,12 +23,33 @@ All abbreviated timer units remain `min`, irrespective of the number.
 - Check both history pages and the current stock. At full stock, complete a habit: progress should record normally, with the full-stock notice.
 - With empty stock, confirm the foraging sign; earn one grass and confirm the sheep returns.
 
-## Still deferred
+## Implemented functional slice — 2026-10-02
 
-- Autonomous sheep behaviour and animations: eating, walking, sleeping and returning.
-- Relationship behaviour and gentle decline during prolonged absence.
-- Optional interactions/minigames, scheduled wake, AI and sync.
-- Coarse battery display and any other items outside the approved 1–7.
+The user authorized code changes for P-004 through P-010. Finish this functional X3 test before starting the formal artwork/UI phase. PR #1 stays draft.
+
+- **P-004 — spacing:** stock and reward labels use `Grass 21 / 21`. Final artwork may use a grass icon; settings retain readable text.
+- **P-005 / P-007 — food:** grass is the only resource. Three local meals at 08:00, 13:00 and 19:00 consume one grass each; cap 21. A fresh installation starts with nine grass. Existing consumable stock and history are preserved; upgrading establishes a new meal baseline without retroactive charges. Daily count completions, daily duration targets and Pomodoro focuses earn +3. A weekly count target below seven apportions 21 across its target completions (e.g. three completions earn +7 each); larger targets earn +3 each. Awards reflect only actual capacity remaining. No food debt or death.
+- **P-006 — week boundary:** Settings → Habits → Week starts on offers all seven days, default Monday. Weekly progress follows the chosen local midnight boundary immediately. Changing it does not rewrite events or award old completions.
+- **P-008 — mood and relationship:** five hearts show mood. Eating restores one heart; a whole local day without food costs one heart, excluding dates touched by pause. A missed meal shows rest; zero hearts shows the foraging sign. Replenishment returns the sheep and shares one of that day's three meal slots if available. Optional hello or a completed game improves bond at most once per local date. Empty days gently reduce bond while mood remains positive. Bond is expressed by position and responses, with no separate meter. Daytime wandering advances in coarse ten-minute poses; nighttime/empty-meal rest uses a static pose, not continuous animation.
+- **P-009 — optional game:** Sheep pairs is an eight-card/four-pair memory game accessible through the sheep menu or Habits settings. Mismatches stay visible until Select, avoiding timed e-ink reveals. Back exits immediately; there are no food rewards or automatic habit completions.
+- **P-010 — pause:** Habit mode Off pauses the running timer and preserves elapsed time. It stops new habit records/rewards and freezes feeding, mood and relationship decline. Resume rebases meal time with no catch-up charges and leaves timers waiting for manual Resume. Paused dates are marked in the existing two-page grass history. Home shows the latest available book's title and cover instead of habit controls. Disabling selects the real Display Cover sleep mode and remembers the prior mode; re-enabling restores it unless the user explicitly changes Display → Sleep Screen while paused.
+
+## X3 checks for this slice
+
+1. At 12:59 → 13:00 and 18:59 → 19:00, return Home and inspect history: exactly one grass per meal, unchanged after reopening or reboot. No scheduled wake is required.
+2. Complete a daily habit (+3), a weekly three-count habit (+7 each), a reading target and a Pomodoro focus. Test near cap 21 and verify the positive notice reports the actual gain. Break skipping still produces no reward.
+3. With no food, verify rest before the hearts reach zero; after five completely empty days verify the foraging sign. New grass returns the sheep. Test by advancing device date/time only on a disposable test SD backup; backward clock changes intentionally do not replay meals.
+4. Turn Habit mode Off with a partially elapsed timer. Read while paused, cross dates, reboot, then enable. Confirm no food/heart catch-up, no paused reading credit, and manual timer resume. Check the book cover/title and both history pages.
+5. Test Cover / Habit Sheep / Quick Resume before disabling. Check pause selects Cover, resume restores the prior choice, and an explicit sleep-screen change during pause remains the user's choice.
+6. Switch Monday ↔ Sunday around a week boundary. Counts should follow the selected week; old completions must not produce reward notices.
+7. Play Sheep pairs using buttons and touch where supported. Confirm a mismatch waits for Select, Back works at every stage, four pairs finish, and grass never increases from playing.
+8. Inspect five hearts, sheep status, selection borders, date/clock, paused book tile, game and history in portrait and both landscape orientations.
+
+## Still deferred until after this device test
+
+- Formal sheep/grass artwork, polished Home/habit/game layouts and animation frames.
+- Richer relationship presentation if the behavioural cues are unclear on X3.
+- Scheduled wake, AI, sync and a coarse battery redesign.
 
 ## Engineering notes
 

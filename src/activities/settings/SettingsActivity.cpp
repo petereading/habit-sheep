@@ -19,6 +19,7 @@
 #include "ClockSettingsActivity.h"
 #include "CrossPointSettings.h"
 #include "FontDownloadActivity.h"
+#include "HabitSheepMode.h"
 #include "HabitSheepStore.h"
 #include "HomeButtonSettingsActivity.h"
 #include "KOReaderSettingsActivity.h"
@@ -37,6 +38,7 @@
 #include "activities/habits/ActiveHabitsActivity.h"
 #include "activities/habits/GrassHistoryActivity.h"
 #include "activities/habits/HabitLibraryActivity.h"
+#include "activities/habits/SheepMemoryActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -124,7 +126,10 @@ void SettingsActivity::rebuildSettingsLists() {
   readerSettings.insert(readerSettings.begin() + 1,
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
-  habitSheepSettings.reserve(4);
+  habitSheepSettings.reserve(7);
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_MODE, SettingAction::HabitMode));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_WEEK_START, SettingAction::HabitWeekStart));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_MEMORY, SettingAction::SheepMemory));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
@@ -239,6 +244,7 @@ void SettingsActivity::onExit() {
 }
 
 void SettingsActivity::applyUiSettingChange(uint8_t CrossPointSettings::* valuePtr) {
+  if (valuePtr == &CrossPointSettings::sleepScreen && !HABIT_SHEEP.isEnabled()) HABIT_SHEEP.clearPausedSleepScreen();
   // Theme changes take effect immediately, on this screen — reload the theme
   // and re-derive the app's tokens so the very next repaint is in the new look.
   if (valuePtr != &CrossPointSettings::uiTheme) {
@@ -362,6 +368,36 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
+      case SettingAction::HabitMode: {
+        const char* options[] = {tr(STR_STATE_OFF), tr(STR_STATE_ON)};
+        optionPopup.show(tr(STR_HABIT_MODE), tr(STR_HABIT_PAUSE_HELP), options, 2, HABIT_SHEEP.isEnabled() ? 1 : 0,
+                         [this](int selected) {
+                           if (!setHabitSheepEnabled(selected == 1)) LOG_ERR("HABIT", "Cannot save habit mode");
+                           requestUpdate();
+                         });
+        requestUpdate();
+        break;
+      }
+      case SettingAction::HabitWeekStart: {
+        const StrId days[] = {StrId::STR_HABIT_SUNDAY,    StrId::STR_HABIT_MONDAY,   StrId::STR_HABIT_TUESDAY,
+                              StrId::STR_HABIT_WEDNESDAY, StrId::STR_HABIT_THURSDAY, StrId::STR_HABIT_FRIDAY,
+                              StrId::STR_HABIT_SATURDAY};
+        optionPopup.show(StrId::STR_HABIT_WEEK_START, days, 7, HABIT_SHEEP.getWeekStart(), [this](int selected) {
+          if (!HABIT_SHEEP.setWeekStart(selected)) LOG_ERR("HABIT", "Cannot save week start");
+          requestUpdate();
+        });
+        requestUpdate();
+        break;
+      }
+      case SettingAction::SheepMemory: {
+        auto activity = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("HABIT", "OOM: memory game");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
       case SettingAction::SheepName: {
         auto activity = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SHEEP_NAME),
                                                                  HABIT_SHEEP.getSheepName(),
@@ -557,6 +593,13 @@ void SettingsActivity::openSleepTimeoutPicker() {
 }
 
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
+  if (setting.action == SettingAction::HabitMode) return HABIT_SHEEP.isEnabled() ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  if (setting.action == SettingAction::HabitWeekStart) {
+    static constexpr StrId days[] = {StrId::STR_HABIT_SUNDAY,    StrId::STR_HABIT_MONDAY,   StrId::STR_HABIT_TUESDAY,
+                                     StrId::STR_HABIT_WEDNESDAY, StrId::STR_HABIT_THURSDAY, StrId::STR_HABIT_FRIDAY,
+                                     StrId::STR_HABIT_SATURDAY};
+    return I18N.get(days[HABIT_SHEEP.getWeekStart()]);
+  }
   if (setting.action == SettingAction::SheepName) return HABIT_SHEEP.getSheepName();
   if (setting.action == SettingAction::ActiveHabits) {
     const auto& active = HABIT_SHEEP.getActiveHabitIds();

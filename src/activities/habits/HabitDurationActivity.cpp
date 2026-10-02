@@ -101,6 +101,10 @@ void HabitDurationActivity::onExit() {
 
 HabitDurationActivity::ActionLabels HabitDurationActivity::actionLabels() const {
   ActionLabels labels;
+  if (!HABIT_SHEEP.isEnabled()) {
+    labels.items[labels.count++] = tr(STR_BACK);
+    return labels;
+  }
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   const bool pomodoro = habit && habit->type == HabitType::Pomodoro;
   const auto phase = HABIT_TIMER.phaseFor(habitId);
@@ -178,6 +182,10 @@ void HabitDurationActivity::continueReading() {
 }
 
 void HabitDurationActivity::activate() {
+  if (!HABIT_SHEEP.isEnabled()) {
+    finish();
+    return;
+  }
   const auto labels = actionLabels();
   if (selection < 0 || selection >= labels.count) return;
 
@@ -239,7 +247,7 @@ void HabitDurationActivity::loop() {
     return;
   }
 
-  if (showHabitReward(addMinutesPopup, &habitId)) {
+  if (HABIT_SHEEP.isEnabled() && showHabitReward(addMinutesPopup, &habitId)) {
     requestUpdate();
     return;
   }

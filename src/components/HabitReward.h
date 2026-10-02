@@ -15,8 +15,11 @@ inline bool showHabitReward(OptionPopup& popup, const std::string* habitId = nul
   if (notice.grass)
     snprintf(message, sizeof(message), tr(STR_HABIT_REWARD_GAIN), static_cast<unsigned>(notice.grass),
              static_cast<unsigned>(notice.stock), static_cast<unsigned>(SheepStateStore::GRASS_CAP));
+  else if (notice.stock < SheepStateStore::GRASS_CAP)
+    snprintf(message, sizeof(message), "%s", tr(STR_HABIT_REWARD_SAVE_FAILED));
   else
-    snprintf(message, sizeof(message), "%s", tr(STR_HABIT_REWARD_FULL));
+    snprintf(message, sizeof(message), tr(STR_HABIT_REWARD_FULL), static_cast<unsigned>(SheepStateStore::GRASS_CAP),
+             static_cast<unsigned>(SheepStateStore::GRASS_CAP));
   popup.showGrassReward(habit ? habit->name.c_str() : tr(STR_HABIT_REWARD_TITLE), message, notice.grass, notice.stock);
   return true;
 }

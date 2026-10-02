@@ -834,6 +834,13 @@
       '<span class="setting-control"><input id="sheep-name" type="text" maxlength="96" value="' +
       escapeHtml(habitSheep.sheepName || '') + '"></span></div>' +
       '<button onclick="saveSheepName()">Save name</button>' +
+      '<div class="setting-row"><span class="setting-name">Habit mode</span>' +
+      '<select onchange="saveHabitMode(this.value)"><option value="on"' + (habitSheep.enabled ? ' selected' : '') + '>On</option>' +
+      '<option value="off"' + (!habitSheep.enabled ? ' selected' : '') + '>Off (pause tracking and sheep care)</option></select></div>' +
+      '<div class="setting-row"><span class="setting-name">Week starts on</span><select onchange="saveHabitWeekStart(this.value)">' +
+      ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(function(day,index) {
+        return '<option value="' + index + '"' + (habitSheep.weekStart === index ? ' selected' : '') + '>' + day + '</option>';
+      }).join('') + '</select></div>' +
       '<h3>Active habits (maximum 3)</h3>';
     for (let slot = 0; slot < 3; slot++) {
       html += '<div class="setting-row"><span class="setting-name">Slot ' + (slot + 1) + '</span>' +
@@ -935,6 +942,12 @@
     }
   }
 
+  async function saveHabitMode(value) {
+    await postHabitSheep({action: 'setEnabled', enabled: value === 'on'});
+  }
+  async function saveHabitWeekStart(value) {
+    await postHabitSheep({action: 'setWeekStart', weekStart: Number(value)});
+  }
   function saveSheepName() {
     postHabitSheep({action: 'setSheepName', name: document.getElementById('sheep-name').value});
   }

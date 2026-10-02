@@ -28,6 +28,7 @@
 #include "RecentBooksStore.h"
 #include "SheepStateStore.h"
 #include "activities/habits/HabitDurationActivity.h"
+#include "activities/habits/SheepMemoryActivity.h"
 #include "components/HabitReward.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -246,6 +247,8 @@ void HomeActivity::onEnter() {
   if (habitSheepUi) {
     loadRecentBooks(1);
     hasContinueReading = !recentBooks.empty();
+    if (!HABIT_SHEEP.isEnabled())
+      loadRecentCovers(std::min(260, static_cast<int>(renderer.getScreenHeight()) - 74 - 52 - 110));
     HABIT_EVENTS.refreshToday();
     SHEEP_STATE.settleDay();
     lastHabitProgressStamp = UINT32_MAX;
@@ -361,9 +364,27 @@ void HomeActivity::activateHabitSheepSelection() {
   const auto action = habitSheepUi->actionForSelection(selectorIndex);
   switch (action) {
     case HabitSheepHomeUi::Action::Sheep:
-      if (SHEEP_STATE.getGrassStock() > 0) {
-        SHEEP_STATE.recordInteraction();
-        habitSheepUi->nudgeSheep();
+      if (!HABIT_SHEEP.isEnabled()) {
+        if (hasContinueReading && !recentBooks.empty())
+          onSelectBook(recentBooks[0].path);
+        else
+          onFileBrowserOpen();
+      } else if (!SHEEP_STATE.isForaging()) {
+        const char* options[] = {tr(STR_SHEEP_PET), tr(STR_SHEEP_MEMORY), tr(STR_CANCEL)};
+        habitReplacementPopup.show(tr(STR_HABIT_SHEEP), options, 3, 0, [this](int selected) {
+          if (selected == 0) {
+            SHEEP_STATE.recordInteraction();
+            habitSheepUi->nudgeSheep();
+          } else if (selected == 1) {
+            // ActivityManager owns the single screen-lifetime game allocation.
+            auto game = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
+            if (game)
+              activityManager.pushActivity(std::move(game));
+            else
+              LOG_ERR("HABIT", "OOM: memory game");
+          }
+          requestUpdate();
+        });
         requestUpdate();
       }
       break;
@@ -434,6 +455,16 @@ void HomeActivity::activateHabitSheepSelection() {
 
 void HomeActivity::loopHabitSheepHome() {
   if (!habitSheepUi) return;
+  if (lastHabitModeRevision != HABIT_SHEEP.getModeRevision()) {
+    lastHabitModeRevision = HABIT_SHEEP.getModeRevision();
+    selectorIndex = 0;
+    if (!HABIT_SHEEP.isEnabled()) {
+      loadRecentBooks(1);
+      hasContinueReading = !recentBooks.empty();
+      loadRecentCovers(std::min(260, static_cast<int>(renderer.getScreenHeight()) - 74 - 52 - 110));
+    }
+    requestUpdate();
+  }
   if (SHEEP_STATE.settleDay() || habitClock.changed()) requestUpdate();
 
   uint32_t progressStamp = 0;
@@ -452,7 +483,7 @@ void HomeActivity::loopHabitSheepHome() {
     return;
   }
 
-  if (showHabitReward(habitReplacementPopup)) {
+  if (HABIT_SHEEP.isEnabled() && showHabitReward(habitReplacementPopup)) {
     requestUpdate();
     return;
   }
@@ -655,7 +686,8 @@ void HomeActivity::render(RenderLock&&) {
   if (habitSheepUi) {
     renderer.clearScreen();
     habitSheepUi->setSelection(selectorIndex);
-    habitSheepUi->renderUi(HABIT_SHEEP, !habitReplacementPopup.isActive());
+    habitSheepUi->renderUi(HABIT_SHEEP, !habitReplacementPopup.isActive(),
+                           recentBooks.empty() ? nullptr : &recentBooks[0]);
     if (habitReplacementPopup.processRender(renderer, mappedInput)) return;
     renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH
                                                                    : HalDisplay::FAST_REFRESH);

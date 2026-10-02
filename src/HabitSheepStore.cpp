@@ -7,8 +7,11 @@
 #include <string_view>
 #include <utility>
 
+#include "HabitTimer.h"
+#include "SheepStateStore.h"
+
 namespace {
-constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 4;
+constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 5;
 
 const char* habitTypeName(const HabitType type) {
   if (type == HabitType::Pomodoro) return "pomodoro";
@@ -45,6 +48,9 @@ bool HabitSheepStore::isActiveElsewhere(const size_t slot, const std::string& ha
 void HabitSheepStore::toJson(JsonDocument& doc) const {
   doc["schema"] = HABIT_SHEEP_SCHEMA_VERSION;
   doc["sheepName"] = sheepName;
+  doc["enabled"] = enabled;
+  doc["weekStart"] = weekStart;
+  doc["pausedSleepScreen"] = pausedSleepScreen;
 
   JsonArray habitArray = doc["habits"].to<JsonArray>();
   for (const auto& habit : habits) {
@@ -70,6 +76,10 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
   habits.clear();
   activeHabitIds.fill("");
   sleepSceneEnabled = doc["sleepSceneEnabled"] | true;
+  enabled = doc["enabled"] | true;
+  weekStart = doc["weekStart"] | static_cast<uint8_t>(1);
+  if (weekStart > 6) weekStart = 1;
+  pausedSleepScreen = doc["pausedSleepScreen"] | static_cast<uint8_t>(255);
 
   const char* storedSheepName = doc["sheepName"] | "";
   if (storedSheepName && strlen(storedSheepName) <= MAX_NAME_BYTES) sheepName = storedSheepName;
@@ -187,4 +197,41 @@ bool HabitSheepStore::setActiveHabit(const size_t slot, const std::string& habit
   if (!habitId.empty() && (!findHabit(habitId) || isActiveElsewhere(slot, habitId))) return false;
   activeHabitIds[slot] = habitId;
   return saveToFile();
+}
+
+bool HabitSheepStore::setEnabled(const bool value, const uint8_t sleepScreen) {
+  if (value == enabled) return true;
+  if (!value) {
+    SHEEP_STATE.settleDay();
+    if (!HABIT_TIMER.pauseAll()) return false;
+  }
+  const uint8_t previousSleep = pausedSleepScreen;
+  if (!value) pausedSleepScreen = sleepScreen;
+  enabled = value;
+  if (!saveToFile()) {
+    enabled = !value;
+    pausedSleepScreen = previousSleep;
+    return false;
+  }
+  ++modeRevision;
+  if (!SHEEP_STATE.syncPause()) LOG_ERR("HABIT", "Sheep pause state will retry at next settlement");
+  return true;
+}
+
+bool HabitSheepStore::setWeekStart(const uint8_t value) {
+  if (value > 6) return false;
+  if (value == weekStart) return true;
+  const uint8_t previous = weekStart;
+  weekStart = value;
+  if (saveToFile()) return true;
+  weekStart = previous;
+  return false;
+}
+
+bool HabitSheepStore::clearPausedSleepScreen() {
+  const uint8_t previous = pausedSleepScreen;
+  pausedSleepScreen = 255;
+  if (saveToFile()) return true;
+  pausedSleepScreen = previous;
+  return false;
 }
