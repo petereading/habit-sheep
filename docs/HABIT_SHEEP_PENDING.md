@@ -84,11 +84,11 @@ The later P-016 proposal is now the preferred Home layout direction. Keep this g
 
 The user's latest design proposal arranges Home vertically:
 
-1. A horizontal row of sheep interaction icons at the top.
+1. A horizontal row of sheep interaction icons at the top: at least three meaningful interactions initially, with room for up to six.
 2. A small caption directly below that row showing the interaction title.
 3. The sheep itself in the central scene, as the main character.
 4. A small caption directly above the habit row showing the habit title.
-5. A horizontal row of at most three active habit icons.
+5. A horizontal row of at most three active habit icons; unset slots show dashed rounded-square placeholders.
 6. Six reading/settings icons along the bottom, retaining the existing dock (user clarification on 2026-10-03).
 
 Hardware buttons move focus to the icons; Confirm opens the focused interaction or habit. Proposed navigation to settle during screen design: Left/Right within a row, Up/Down between rows, a clear focus frame, and the caption showing the currently focused item. Touch-capable devices should retain direct selection. These control details are recommendations, not additional user-approved implementation rules.
@@ -98,6 +98,21 @@ Preserve the previously agreed five mood hearts without the word Mood, grass sto
 The user confirmed retaining all six existing dock entries: Continue reading, Browse files, Library, OPDS, Transfer and Settings. No merging, removal or relocation is requested. This corrects the initial recollection of five icons. The interaction icons and the way user-defined habits obtain recognisable icons remain design choices.
 
 This supersedes a summoned icon grid as the current primary Home layout direction. Record the proposal only; no runtime changes, artwork implementation or firmware CI run are authorized in this update. P-012 (Home freeze) remains the functional blocker before implementing formal screens.
+
+### P-017: Unset habit slots — 2026-10-03 Europe/London
+
+- Keep the three-slot habit row. An unset slot is a dashed rounded square rather than an invented habit or a missing layout position.
+- Proposed action for screen design: allow hardware focus on an empty slot, show a caption such as Choose habit, and Confirm opens the existing saved-habit selector. This is a recommendation awaiting implementation decisions, not permission to change navigation now.
+- Retain the nine-habit library and maximum three active habits; do not require Reading as one of them.
+
+### P-018: Three to six sheep interactions — 2026-10-03 Europe/London
+
+- The user wants additional sheep interactions, at least three in total, and asks whether the top row could hold up to six like the existing bottom dock.
+- Layout estimate, not a verified screen: X3 portrait is 528 pixels wide. Reserving 24 pixels on each side leaves 480, or 80 pixels per slot for six. Simple 40–48 pixel icons with a 60–64 pixel focus frame can fit, provided only the selected interaction's caption appears below the row. Verify recognisability and vertical spacing on X3 during formal screen design.
+- Recommend starting with three meaningful entries and adding up to six as actual features exist; do not add filler actions simply to fill six positions.
+- Suggested initial entries, not yet selected/implemented: Pet sheep, Call sheep, and Play (Sheep pairs). Calling should show a response/approach while the sheep is present; it must not bypass the food-driven return rule while the sheep is foraging.
+- Additional interactions remain optional and must not generate grass or automatic habit completions. Relationship feedback can be behavioural. Empty interaction capacity need not imitate empty habit placeholders.
+- Record/design discussion only. No runtime changes or firmware CI run for this feedback.
 
 ## Still deferred until after this device test
 
