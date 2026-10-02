@@ -89,13 +89,13 @@ The user's latest design proposal arranges Home vertically:
 3. The sheep itself in the central scene, as the main character.
 4. A small caption directly above the habit row showing the habit title.
 5. A horizontal row of at most three active habit icons.
-6. Five reading/settings icons along the bottom.
+6. Six reading/settings icons along the bottom, retaining the existing dock (user clarification on 2026-10-03).
 
 Hardware buttons move focus to the icons; Confirm opens the focused interaction or habit. Proposed navigation to settle during screen design: Left/Right within a row, Up/Down between rows, a clear focus frame, and the caption showing the currently focused item. Touch-capable devices should retain direct selection. These control details are recommendations, not additional user-approved implementation rules.
 
 Preserve the previously agreed five mood hearts without the word Mood, grass stock, clock/battery information, habit progress/confirmation and active-habit replacement. Their compact placement is still to be designed. A possible selected-habit caption can combine the name with progress rather than retaining full-width habit text rows.
 
-The existing dock currently has six entries: Continue reading, Browse files, Library, OPDS, Transfer and Settings. The new proposal specifies five; which entries to combine or relocate remains undecided. Do not silently remove access to Library or other reading functions. The interaction icons and the way user-defined habits obtain recognisable icons also remain design choices.
+The user confirmed retaining all six existing dock entries: Continue reading, Browse files, Library, OPDS, Transfer and Settings. No merging, removal or relocation is requested. This corrects the initial recollection of five icons. The interaction icons and the way user-defined habits obtain recognisable icons remain design choices.
 
 This supersedes a summoned icon grid as the current primary Home layout direction. Record the proposal only; no runtime changes, artwork implementation or firmware CI run are authorized in this update. P-012 (Home freeze) remains the functional blocker before implementing formal screens.
 
