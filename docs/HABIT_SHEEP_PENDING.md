@@ -45,6 +45,39 @@ The user authorized code changes for P-004 through P-010. Finish this functional
 7. Play Sheep pairs using buttons and touch where supported. Confirm a mismatch waits for Select, Back works at every stage, four pairs finish, and grass never increases from playing.
 8. Inspect five hearts, sheep status, selection borders, date/clock, paused book tile, game and history in portrait and both landscape orientations.
 
+## Pending X3 feedback — 2026-10-02 (firmware 5fde8ed)
+
+Record only: the user has not authorized implementation of this new feedback yet. No runtime changes or firmware CI run for this update. The Home freeze remains unresolved and takes priority before the formal artwork/UI phase; passing automated tests does not establish X3 runtime stability.
+
+### P-011: Remove the Mood label
+
+- Keep the five hearts and remove the word `Mood` beside them. The hearts already communicate mood.
+- This is a presentation change; retain the existing mood calculation.
+
+### P-012: Home freezes after some use — priority blocker
+
+- X3 report: after playing/using the firmware for a while, Home freezes and buttons stop responding.
+- The exact sequence, elapsed time, and whether this involves entering or leaving Sheep pairs have not been established. Cause unknown; do not claim a game, refresh, memory or locking issue without evidence.
+- Next authorized debugging pass should reproduce the transition sequence and distinguish a frozen display from a stalled input/main loop, including clock refresh, popup/game transitions and sleep/wake where relevant. Capture serial diagnostics if available.
+- Acceptance: repeated interactions/game sessions and returns to Home remain responsive, with working navigation, clock updates and sleep/wake. Resolve this before declaring the functional build stable and proceeding to formal screens.
+
+### P-013: Keep Sheep pairs out of Habits settings
+
+- Remove the Sheep pairs entry from Settings → Habits. It is an activity, not a setting.
+- Retain access through the sheep interaction menu.
+
+### P-014: Distinguish pairs through sheep appearance
+
+- Replace the numerical identifiers on Sheep pairs cards with small visual differences between sheep, for example black/white heads and different leg colours.
+- Pair cards by matching sheep appearance. Use clearly distinct monochrome markings suitable for X3 e-ink; keep variants recognisable at card size.
+- Preserve the existing game rules, immediate exit and absence of grass/habit rewards.
+
+### P-015: Future interaction menu as an icon grid
+
+- When more sheep interactions exist, consider replacing the summoned text menu with a 4×4 or 3×2 icon grid.
+- Icons should make games and other interactions recognisable at a glance, with visible focus and button/touch access.
+- Grid size and icon artwork are future design choices, not selected for implementation yet.
+
 ## Still deferred until after this device test
 
 - Formal sheep/grass artwork, polished Home/habit/game layouts and animation frames.
