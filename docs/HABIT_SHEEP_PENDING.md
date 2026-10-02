@@ -74,9 +74,30 @@ Record only: the user has not authorized implementation of this new feedback yet
 
 ### P-015: Future interaction menu as an icon grid
 
+The later P-016 proposal is now the preferred Home layout direction. Keep this grid idea as a future option; it is not an instruction to implement a popup grid now.
+
 - When more sheep interactions exist, consider replacing the summoned text menu with a 4×4 or 3×2 icon grid.
 - Icons should make games and other interactions recognisable at a glance, with visible focus and button/touch access.
 - Grid size and icon artwork are future design choices, not selected for implementation yet.
+
+### P-016: Tamagotchi-inspired Home layout — 2026-10-03 Europe/London
+
+The user's latest design proposal arranges Home vertically:
+
+1. A horizontal row of sheep interaction icons at the top.
+2. A small caption directly below that row showing the interaction title.
+3. The sheep itself in the central scene, as the main character.
+4. A small caption directly above the habit row showing the habit title.
+5. A horizontal row of at most three active habit icons.
+6. Five reading/settings icons along the bottom.
+
+Hardware buttons move focus to the icons; Confirm opens the focused interaction or habit. Proposed navigation to settle during screen design: Left/Right within a row, Up/Down between rows, a clear focus frame, and the caption showing the currently focused item. Touch-capable devices should retain direct selection. These control details are recommendations, not additional user-approved implementation rules.
+
+Preserve the previously agreed five mood hearts without the word Mood, grass stock, clock/battery information, habit progress/confirmation and active-habit replacement. Their compact placement is still to be designed. A possible selected-habit caption can combine the name with progress rather than retaining full-width habit text rows.
+
+The existing dock currently has six entries: Continue reading, Browse files, Library, OPDS, Transfer and Settings. The new proposal specifies five; which entries to combine or relocate remains undecided. Do not silently remove access to Library or other reading functions. The interaction icons and the way user-defined habits obtain recognisable icons also remain design choices.
+
+This supersedes a summoned icon grid as the current primary Home layout direction. Record the proposal only; no runtime changes, artwork implementation or firmware CI run are authorized in this update. P-012 (Home freeze) remains the functional blocker before implementing formal screens.
 
 ## Still deferred until after this device test
 
