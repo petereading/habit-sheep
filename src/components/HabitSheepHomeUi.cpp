@@ -195,10 +195,10 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, int top, int 
     const int slot = selection >= 1 && selection <= 3 ? selection - 1 : 0;
     const auto* habit = store.findHabit(store.getActiveHabitIds()[slot]);
     char label[100];
-    char progress[40];
     if (selection == 10)
       snprintf(label, sizeof(label), "%s", tr(STR_GRASS_HISTORY));
     else if (habit) {
+      char progress[40];
       habitUi::habitProgress(*habit, progress, sizeof(progress));
       snprintf(label, sizeof(label), "%s · %s", habit->name.c_str(), progress);
     } else
