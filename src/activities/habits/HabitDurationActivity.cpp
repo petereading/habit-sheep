@@ -48,7 +48,7 @@ TimerLayout pomodoroLayout(const GfxRenderer& renderer, int count = 6) {
           digitsY,
           progressY,
           barY,
-          renderer.getScreenHeight() - GUI.getMetrics().buttonHintsHeight - 18 - count * rowH,
+          renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight - 18 - count * rowH,
           rowH};
 }
 

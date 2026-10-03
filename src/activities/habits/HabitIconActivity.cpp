@@ -1,6 +1,7 @@
 #include "HabitIconActivity.h"
 
 #include <HalDisplay.h>
+#include <I18n.h>
 
 #include <algorithm>
 
@@ -25,7 +26,8 @@ void HabitIconActivity::loop() {
     requestUpdate();
   }
   const int w = renderer.getScreenWidth(), h = renderer.getScreenHeight(),
-            top = GUI.getMetrics().headerHeight + GUI.getMetrics().topPadding + 20;
+            top =
+                UITheme::getInstance().getMetrics().headerHeight + UITheme::getInstance().getMetrics().topPadding + 20;
   const int rowH = (h - top - 115) / 3, step = (w - 48) / 4;
   for (int i = 0; i < 12; ++i) {
     if (mappedInput.wasTapInRect(24 + (i % 4) * step, top + (i / 4) * rowH, step, rowH)) {
@@ -48,9 +50,13 @@ void HabitIconActivity::loop() {
 void HabitIconActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const int w = renderer.getScreenWidth(), h = renderer.getScreenHeight();
-  const int top = GUI.getMetrics().headerHeight + GUI.getMetrics().topPadding + 20, step = (w - 48) / 4,
-            rowH = (h - top - 115) / 3;
-  GUI.drawHeader(renderer, Rect{0, GUI.getMetrics().topPadding, w, GUI.getMetrics().headerHeight}, tr(STR_HABIT_ICON));
+  const int top =
+                UITheme::getInstance().getMetrics().headerHeight + UITheme::getInstance().getMetrics().topPadding + 20,
+            step = (w - 48) / 4, rowH = (h - top - 115) / 3;
+  GUI.drawHeader(
+      renderer,
+      Rect{0, UITheme::getInstance().getMetrics().topPadding, w, UITheme::getInstance().getMetrics().headerHeight},
+      tr(STR_HABIT_ICON));
   for (int i = 0; i < 12; ++i) {
     const int index = (selected / 12) * 12 + i, tile = std::min(90, std::min(step - 12, rowH - 12));
     const int x = 24 + (i % 4) * step + (step - tile) / 2, y = top + (i / 4) * rowH + 8;

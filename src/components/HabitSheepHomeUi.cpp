@@ -6,6 +6,7 @@
 #include <HalClock.h>
 #include <HalPowerManager.h>
 #include <HalStorage.h>
+#include <I18n.h>
 #include <Memory.h>
 
 #include <algorithm>
@@ -75,7 +76,7 @@ void header(const GfxRenderer& r, bool sleeping) {
         r.drawCenteredText(SMALL_FONT_ID, 18, clock);
     }
   }
-  const auto& m = GUI.getMetrics();
+  const auto& m = UITheme::getInstance().getMetrics();
   GUI.drawBatteryLeft(r, Rect{r.getScreenWidth() - PAD - m.batteryWidth, 18, m.batteryWidth, m.batteryHeight},
                       !sleeping);
 }

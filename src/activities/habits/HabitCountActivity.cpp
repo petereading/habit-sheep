@@ -2,6 +2,7 @@
 
 #include <HalClock.h>
 #include <HalDisplay.h>
+#include <I18n.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -50,9 +51,12 @@ void HabitCountActivity::render(RenderLock&&) {
   if (!habit) return;
   const int w = renderer.getScreenWidth(), h = renderer.getScreenHeight();
   const bool compact = h <= 600;
-  GUI.drawHeader(renderer, Rect{0, GUI.getMetrics().topPadding, w, GUI.getMetrics().headerHeight}, habit->name.c_str(),
-                 nullptr, true, true);
-  const int top = GUI.getMetrics().topPadding + GUI.getMetrics().headerHeight + 12;
+  GUI.drawHeader(
+      renderer,
+      Rect{0, UITheme::getInstance().getMetrics().topPadding, w, UITheme::getInstance().getMetrics().headerHeight},
+      habit->name.c_str(), nullptr, true, true);
+  const int top =
+      UITheme::getInstance().getMetrics().topPadding + UITheme::getInstance().getMetrics().headerHeight + 12;
   habitUi::icon(renderer, habitUi::iconFor(*habit), w / 2 - 24, top, 48);
   const bool weekly = habit->period == HabitPeriod::Weekly;
   renderer.drawCenteredText(SMALL_FONT_ID, top + 56, weekly ? tr(STR_HABIT_THIS_WEEK) : tr(STR_HABIT_TODAY));
