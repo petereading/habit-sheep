@@ -226,7 +226,7 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, bool showDock, con
     renderer.drawCenteredText(SMALL_FONT_ID, HEADER + 4, tr(STR_GRASS_PAUSED));
     bool drawn = false;
     if (book && !book->coverBmpPath.empty()) {
-      const auto path = GUI.getCoverThumbPath(book->coverBmpPath, coverH);
+      const auto path = UITheme::getCoverThumbPath(book->coverBmpPath, coverH);
       HalFile file;
       if (Storage.openFileForRead("HOME", path.c_str(), file)) {
         auto bitmap = makeUniqueNoThrow<Bitmap>(file);
