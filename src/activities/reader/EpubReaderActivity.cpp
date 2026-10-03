@@ -370,6 +370,7 @@ void EpubReaderActivity::openFootnoteSelect(const bool reopenMenuOnCancel) {
 }
 
 void EpubReaderActivity::loop() {
+  recordReadingTime();
   if (!epub) {
     finish();
     return;

@@ -24,7 +24,9 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HabitSheepStore.h"
 #include "activities/reader/ReaderUtils.h"
+#include "components/HabitSheepHomeUi.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "images/Logo120.h"
@@ -550,6 +552,8 @@ void SleepActivity::onEnter() {
   }
 
   switch (SETTINGS.sleepScreen) {
+    case CrossPointSettings::HABIT_SHEEP_SCENE:
+      return renderHabitSheepSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::BLANK):
       return renderBlankSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM):
@@ -616,6 +620,12 @@ void SleepActivity::renderCustomSleepScreen() const {
 // firmware's only clean refresh in normal operation is the single-pass 0xD7
 // sequence, used once for the sleep image. It never runs the multi-flash GC
 // waveform (0xF7) that FULL_REFRESH selects (#2471's blinking complaint).
+void SleepActivity::renderHabitSheepSleepScreen() const {
+  HabitSheepHomeUi sleepUi(renderer);
+  sleepUi.renderSleepUi(HABIT_SHEEP);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+}
+
 void SleepActivity::renderDefaultSleepScreen() const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();

@@ -29,6 +29,13 @@ enum class SettingAction {
   KeyboardLayouts,
   HomeButton,
   About,
+  SheepName,
+  ActiveHabits,
+  HabitLibrary,
+  GrassHistory,
+  HabitMode,
+  HabitWeekStart,
+  SheepMemory,
 };
 
 struct SettingInfo {
@@ -180,6 +187,7 @@ class SettingsActivity final : public UiTabListActivity {
   std::vector<SettingInfo> readerSettings;
   std::vector<SettingInfo> controlsSettings;
   std::vector<SettingInfo> systemSettings;
+  std::vector<SettingInfo> habitSheepSettings;
   const std::vector<SettingInfo>* currentSettings = nullptr;
 
   bool preserveQuickResumeTimeoutOn = false;
@@ -197,9 +205,11 @@ class SettingsActivity final : public UiTabListActivity {
   std::vector<freeink::ui::ListItem> rowItems_;
   void rebuildRowItems();
 
-  static constexpr int categoryCount = 4;
+  const int initialCategoryIndex;
+  static constexpr int categoryCount = 5;
   static constexpr StrId categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
-                                                         StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
+                                                         StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM,
+                                                         StrId::STR_CAT_HABIT_SHEEP};
 
   // --- UiTabListActivity contract ---
   int listCount() const override { return settingsCount; }
@@ -227,7 +237,7 @@ class SettingsActivity final : public UiTabListActivity {
   void drawFooter() override;
 
  public:
-  explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
+  explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, int initialCategory = 0);
   void onEnter() override;
   void onExit() override;
   void render(RenderLock&& lock) override;
