@@ -1,6 +1,6 @@
 # Habit Sheep — implemented screens and X3 verification
 
-Updated 2026-10-03. The user authorized implementation of every agreed screen and pending functional item. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
+Updated 2026-10-03. The current implementation below describes firmware from `2f5afa54589ae7a05de9154d1adb0cbc0dfde5a6`. The user requested that the latest X3 visual feedback be recorded only: the new pending items below have not been implemented, and this documentation update makes no code or firmware changes. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
 
 ## Current implementation
 
@@ -38,6 +38,24 @@ History records actual earned/eaten grass, paused dates and dashes for dates wit
 The earlier X3 freeze was not accompanied by reproduction steps or Serial logs, so its cause is not proven. The previous OptionPopup invoked its own stored std::function. Habit creation and confirmation callbacks can replace that same function while its closure is still executing. `invokePopupChoice` now moves the callback into a local owner before invoking it, preserving its captures and any newly installed callback. The real helper has a regression test for this replacement sequence. Evidence: `src/components/OptionPopup.h:107` and `:148` route the old touch/Confirm call sites through `src/components/PopupCallback.h`; creation callbacks in `src/activities/habits/HabitLibraryActivity.cpp` replace the popup during execution.
 
 Habit Home, timer, count, icon, history, game and library loop mutations now share RenderLock with rendering. Activity-result handlers use the same lock. Popup rows are held in the existing popup object and paginate to fit landscape instead of selecting off-screen entries. No hardware freeze resolution is claimed until the X3 test below passes.
+
+## Pending X3 visual feedback — 2026-10-03
+
+Status: record only; do not implement or rebuild yet. These items supersede the affected visual details in the current implementation table once implementation is authorized. Existing care rules and grass accounting remain unchanged.
+
+| ID | Pending request / decision | Notes for later implementation |
+| --- | --- | --- |
+| P-019 | Remove permanent frames around the three configured top habit icons; enlarge the icons. | Plain icons at rest. Hardware-selected icons still need the single-line focus indicator in P-020. Previously agreed dashed empty-slot placeholders remain unless separately changed. |
+| P-020 | All hardware-navigation selection indicators use a single-line frame. | Apply consistently to selectable items, including habits, grass/history, sheep, dock and other screens. Keep adequate padding around content. |
+| P-021 | Reserve double-line frames for popup messages and windows. | Preserve the agreed popup design; separate popup borders from ordinary focus indicators. |
+| P-022 | Replace Home's numeric grass stock with seven right-aligned grass symbols, analogous to the five hearts. Each meal removes one third of one symbol. | Cap 21: each complete symbol represents three grass units; three meals consume one symbol per day. Preserve direct selection/tap access to the 14-day grass history. Proposed rendering, not yet approved: each symbol has three distinct blades, allowing exact one-third/two-thirds states without clipping an indistinct shape. 18 units = six full symbols and one empty slot; 17 = five full, one two-thirds and one empty. Settings/history retain exact numeric stock. Check spacing against habit captions and focus frames in all orientations. |
+| P-023 | Keep the entire Home battery display within the right margin. | Current header reserves only icon width, while `BaseTheme::drawBatteryLeft` appends the percentage to its right. Later layout should measure the complete icon/spacing/text group and right-align it. Sleep retains battery without percentage. |
+| P-024 | Replace the unnatural long straight ground line beneath the sheep. | Design proposal, awaiting agreement: a short, slightly curved ground mark or subtle contact shadow, with no decorative grass. Review Home and Habit Sheep sleep scenes consistently. |
+| P-025 | Review excessive blank space above the sheep and explain its purpose. | Current artwork is capped at 380 pixels wide and anchored near the bottom of the scene; the large gap is a layout result, not a deliberate reserve for a large jump. Proposed: rebalance vertical placement/scale, retaining only the room actually needed by all poses and the foraging sign. |
+| P-026 | Make sheep outlines slightly thinner, but keep them heavier than the other icons. | Review the original artwork and its actual scaled display size; preserve monochrome e-ink readability. |
+| P-027 | Review the tiny sheep name, which currently has little purpose. | Awaiting a design decision. Recommendation: keep user naming, remove the small permanent Home label and use the sheep's name as the interaction-window title, optionally in Pet/Call responses. This gives the name a role without adding Home clutter. |
+
+Source checks: `HabitSheepHomeUi.cpp` explicitly selects fixed font IDs for Home text; `UIScale.h` also defines one fixed UI tier. Home does not follow the reader's selected font size. The reported overlap should be addressed as layout/padding, rather than attributed to the user's font preference. No visual fix or hardware validation is claimed by this documentation-only update.
 
 ## X3 verification checklist
 
