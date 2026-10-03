@@ -27,12 +27,13 @@ constexpr Bitmap SHEEP[] = {habitArt::sheep_00, habitArt::sheep_01, habitArt::sh
                             habitArt::sheep_12, habitArt::sheep_13, habitArt::sheep_14, habitArt::sheep_15,
                             habitArt::sheep_16, habitArt::sheep_17};
 constexpr Bitmap PAIRS[] = {habitArt::pair_00, habitArt::pair_01, habitArt::pair_02, habitArt::pair_03};
-constexpr StrId NAMES[] = {STR_ICON_READING, STR_ICON_FOCUS,        STR_ICON_WRITING,  STR_ICON_STUDY,
-                           STR_ICON_WALKING, STR_ICON_RUNNING,      STR_ICON_STRENGTH, STR_ICON_WATER,
-                           STR_ICON_REST,    STR_ICON_MEDITATION,   STR_ICON_FOOD,     STR_ICON_CLEANING,
-                           STR_ICON_MUSIC,   STR_ICON_PAINTING,     STR_ICON_PLANT,    STR_ICON_STAR,
-                           STR_ICON_FAMILY,  STR_ICON_RELATIONSHIP, STR_ICON_MONEY,    STR_ICON_PHONE,
-                           STR_ICON_FLAG,    STR_ICON_TARGET,       STR_ICON_CHECK,    STR_ICON_SUN};
+constexpr StrId NAMES[] = {
+    StrId::STR_ICON_READING, StrId::STR_ICON_FOCUS,        StrId::STR_ICON_WRITING,  StrId::STR_ICON_STUDY,
+    StrId::STR_ICON_WALKING, StrId::STR_ICON_RUNNING,      StrId::STR_ICON_STRENGTH, StrId::STR_ICON_WATER,
+    StrId::STR_ICON_REST,    StrId::STR_ICON_MEDITATION,   StrId::STR_ICON_FOOD,     StrId::STR_ICON_CLEANING,
+    StrId::STR_ICON_MUSIC,   StrId::STR_ICON_PAINTING,     StrId::STR_ICON_PLANT,    StrId::STR_ICON_STAR,
+    StrId::STR_ICON_FAMILY,  StrId::STR_ICON_RELATIONSHIP, StrId::STR_ICON_MONEY,    StrId::STR_ICON_PHONE,
+    StrId::STR_ICON_FLAG,    StrId::STR_ICON_TARGET,       StrId::STR_ICON_CHECK,    StrId::STR_ICON_SUN};
 
 void ink(const GfxRenderer& renderer, const Bitmap& bitmap, int x, int y, int width, int height) {
   if (width <= 0 || height <= 0) return;
@@ -57,7 +58,7 @@ namespace habitUi {
 uint8_t iconFor(const HabitDefinition& habit) {
   return habit.icon < 24 ? habit.icon : habit.type == HabitType::Pomodoro ? 1 : habit.readingIntegration ? 0 : 15;
 }
-const char* iconName(uint8_t value) { return tr(NAMES[value < 24 ? value : 15]); }
+const char* iconName(uint8_t value) { return I18N.get(NAMES[value < 24 ? value : 15]); }
 void icon(const GfxRenderer& r, uint8_t value, int x, int y, int size) {
   ink(r, ICONS[value < 24 ? value : 15], x, y, size, size);
 }

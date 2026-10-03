@@ -140,8 +140,9 @@ void HabitDurationActivity::showAddMinutes() {
 }
 
 void HabitDurationActivity::showCustomMinutes() {
-  auto editor = makeUniqueNoThrow<IntervalSelectionActivity>(
-      renderer, mappedInput, "HabitMinutes", STR_HABIT_ADD_MINUTES, 15, 1, 1440, 1, 5, STR_HABIT_MINUTE_VALUE);
+  auto editor =
+      makeUniqueNoThrow<IntervalSelectionActivity>(renderer, mappedInput, "HabitMinutes", StrId::STR_HABIT_ADD_MINUTES,
+                                                   15, 1, 1440, 1, 5, StrId::STR_HABIT_MINUTE_VALUE);
   if (!editor) return;
   startActivityForResult(std::move(editor), [this](const ActivityResult& result) {
     RenderLock lock;

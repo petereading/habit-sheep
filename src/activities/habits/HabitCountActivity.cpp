@@ -55,7 +55,7 @@ void HabitCountActivity::render(RenderLock&&) {
   const int top = GUI.getMetrics().topPadding + GUI.getMetrics().headerHeight + 12;
   habitUi::icon(renderer, habitUi::iconFor(*habit), w / 2 - 24, top, 48);
   const bool weekly = habit->period == HabitPeriod::Weekly;
-  renderer.drawCenteredText(SMALL_FONT_ID, top + 56, tr(weekly ? STR_HABIT_THIS_WEEK : STR_HABIT_TODAY));
+  renderer.drawCenteredText(SMALL_FONT_ID, top + 56, weekly ? tr(STR_HABIT_THIS_WEEK) : tr(STR_HABIT_TODAY));
   if (weekly) {
     tm local{};
     if (halClock.localTime(local)) {

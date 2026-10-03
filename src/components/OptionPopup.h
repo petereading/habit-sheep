@@ -326,7 +326,7 @@ class OptionPopup {
       const int step = content.width / 2;
       for (int i = 0; i < 2; ++i) {
         const int px = content.x + i * step;
-        renderer.drawText(SMALL_FONT_ID, px + 8, content.y + 8, tr(i ? STR_HABIT_NEXT : STR_HABIT_PREVIOUS));
+        renderer.drawText(SMALL_FONT_ID, px + 8, content.y + 8, i ? tr(STR_HABIT_NEXT) : tr(STR_HABIT_PREVIOUS));
         frame.hit(fui::Rect{static_cast<int16_t>(px), content.y, static_cast<int16_t>(step), 44}, ACTION_PAGE,
                   i ? std::min(std::min(totalOptions, MAX_OPTIONS) - 1, first + count) : std::max(0, first - count),
                   fui::InputTouch);
