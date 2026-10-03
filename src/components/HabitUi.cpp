@@ -13,20 +13,20 @@
 #include "icons/habitArt.generated.h"
 
 namespace {
-using habitArt::Bitmap;
-constexpr Bitmap ICONS[] = {
+using ArtBitmap = habitArt::Bitmap;
+constexpr ArtBitmap ICONS[] = {
     habitArt::habit_reading, habitArt::habit_focus,        habitArt::habit_writing,  habitArt::habit_study,
     habitArt::habit_walking, habitArt::habit_running,      habitArt::habit_strength, habitArt::habit_water,
     habitArt::habit_rest,    habitArt::habit_meditation,   habitArt::habit_food,     habitArt::habit_cleaning,
     habitArt::habit_music,   habitArt::habit_painting,     habitArt::habit_plant,    habitArt::habit_general,
     habitArt::habit_family,  habitArt::habit_relationship, habitArt::habit_money,    habitArt::habit_phone,
     habitArt::habit_flag,    habitArt::habit_target,       habitArt::habit_check,    habitArt::habit_sun};
-constexpr Bitmap SHEEP[] = {habitArt::sheep_00, habitArt::sheep_01, habitArt::sheep_02, habitArt::sheep_03,
-                            habitArt::sheep_04, habitArt::sheep_05, habitArt::sheep_06, habitArt::sheep_07,
-                            habitArt::sheep_08, habitArt::sheep_09, habitArt::sheep_10, habitArt::sheep_11,
-                            habitArt::sheep_12, habitArt::sheep_13, habitArt::sheep_14, habitArt::sheep_15,
-                            habitArt::sheep_16, habitArt::sheep_17};
-constexpr Bitmap PAIRS[] = {habitArt::pair_00, habitArt::pair_01, habitArt::pair_02, habitArt::pair_03};
+constexpr ArtBitmap SHEEP[] = {habitArt::sheep_00, habitArt::sheep_01, habitArt::sheep_02, habitArt::sheep_03,
+                               habitArt::sheep_04, habitArt::sheep_05, habitArt::sheep_06, habitArt::sheep_07,
+                               habitArt::sheep_08, habitArt::sheep_09, habitArt::sheep_10, habitArt::sheep_11,
+                               habitArt::sheep_12, habitArt::sheep_13, habitArt::sheep_14, habitArt::sheep_15,
+                               habitArt::sheep_16, habitArt::sheep_17};
+constexpr ArtBitmap PAIRS[] = {habitArt::pair_00, habitArt::pair_01, habitArt::pair_02, habitArt::pair_03};
 constexpr StrId NAMES[] = {
     StrId::STR_ICON_READING, StrId::STR_ICON_FOCUS,        StrId::STR_ICON_WRITING,  StrId::STR_ICON_STUDY,
     StrId::STR_ICON_WALKING, StrId::STR_ICON_RUNNING,      StrId::STR_ICON_STRENGTH, StrId::STR_ICON_WATER,
@@ -35,7 +35,7 @@ constexpr StrId NAMES[] = {
     StrId::STR_ICON_FAMILY,  StrId::STR_ICON_RELATIONSHIP, StrId::STR_ICON_MONEY,    StrId::STR_ICON_PHONE,
     StrId::STR_ICON_FLAG,    StrId::STR_ICON_TARGET,       StrId::STR_ICON_CHECK,    StrId::STR_ICON_SUN};
 
-void ink(const GfxRenderer& renderer, const Bitmap& bitmap, int x, int y, int width, int height) {
+void ink(const GfxRenderer& renderer, const ArtBitmap& bitmap, int x, int y, int width, int height) {
   if (width <= 0 || height <= 0) return;
   const int stride = (bitmap.width + 7) / 8;
   for (int row = 0; row < height; ++row) {
@@ -72,7 +72,7 @@ void hearts(const GfxRenderer& r, int x, int y, int size, uint8_t mood) {
     ink(r, i < mood ? habitArt::heart : habitArt::heart_empty, x + i * (size + 6), y, size, size);
 }
 void interaction(const GfxRenderer& r, int action, int x, int y, int size) {
-  const Bitmap& b = action == 0 ? habitArt::pet : action == 1 ? habitArt::call : habitArt::play;
+  const ArtBitmap& b = action == 0 ? habitArt::pet : action == 1 ? habitArt::call : habitArt::play;
   ink(r, b, x, y, size, size);
 }
 void frame(const GfxRenderer& r, int x, int y, int w, int h, bool focused) {
