@@ -13,6 +13,7 @@ class HabitLibraryActivity final : public UiListActivity {
 
   void onEnter() override;
   void render(RenderLock&& lock) override;
+  void loop() override;
 
  private:
   std::vector<std::string> labels;
@@ -49,4 +50,5 @@ class HabitLibraryActivity final : public UiListActivity {
   void changePomodoroSessions(const std::string& habitId);
   void toggleReadingIntegration(const std::string& habitId);
   void confirmDelete(const std::string& habitId);
+  void changeIcon(const std::string& habitId);
 };

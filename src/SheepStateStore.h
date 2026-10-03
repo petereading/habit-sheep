@@ -29,6 +29,12 @@ class SheepStateStore : public PersistableStore<SheepStateStore> {
   uint8_t getMood() const { return mood; }
   bool isForaging() const { return mood == 0; }
   bool isResting() const { return missedMeal && !isForaging(); }
+  bool ateCurrentMeal(const tm& local) const {
+    const uint32_t day =
+        static_cast<uint32_t>(local.tm_year + 1900) * 10000U + (local.tm_mon + 1) * 100U + local.tm_mday;
+    const uint8_t slot = local.tm_hour == 8 ? 1 : local.tm_hour == 13 ? 2 : local.tm_hour == 19 ? 3 : 0;
+    return slot && local.tm_min < 5 && day == lastFedDay && mealsProcessed >= slot && eatenToday && !missedMeal;
+  }
   bool syncPause();
 
   void recordInteraction();

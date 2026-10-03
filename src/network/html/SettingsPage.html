@@ -869,6 +869,8 @@
       '<div class="setting-row"><span class="setting-name">Type</span><select id="habit-type" onchange="updateHabitForm()">' +
       '<option value="duration">Duration</option><option value="pomodoro">Pomodoro</option>' +
       '<option value="completion">Completion</option></select></div>' +
+      '<div class="setting-row"><span class="setting-name">Icon</span><select id="habit-icon">' +
+      ['Reading','Pomodoro','Writing','Study','Walking','Running','Strength','Drink water','Rest','Meditation','Meals','Cleaning','Music','Painting','Plant care','Star','Family','Relationship','Money','Phone','Flag','Target','Check','Sun'].map(function(name,index) { return '<option value="' + index + '">' + name + '</option>'; }).join('') + '</select></div>' +
       '<div class="setting-row" id="habit-period-row"><span class="setting-name">Period</span>' +
       '<select id="habit-period"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div>' +
       '<div class="setting-row" id="habit-count-row"><span class="setting-name">Times per period</span>' +
@@ -901,6 +903,7 @@
       document.getElementById('habit-reading').checked = !!editing.readingIntegration;
       document.getElementById('habit-period').value = editing.period || 'daily';
       document.getElementById('habit-count').value = editing.targetCount || 1;
+      document.getElementById('habit-icon').value = editing.icon < 24 ? editing.icon : editing.type === 'pomodoro' ? 1 : editing.readingIntegration ? 0 : 15;
     }
     updateHabitForm();
   }
@@ -978,7 +981,7 @@
     postHabitSheep({action: 'saveHabit', id: editingHabitId, name: name, type: type,
       targetMinutes: type === 'completion' ? 0 : targetMinutes,
       shortBreakMinutes: shortBreakMinutes, longBreakMinutes: longBreakMinutes, sessionsPerCycle: sessionsPerCycle,
-      period: period, targetCount: targetCount,
+      period: period, targetCount: targetCount, icon: Number(document.getElementById('habit-icon').value),
       readingIntegration: type === 'duration' && document.getElementById('habit-reading').checked});
     editingHabitId = '';
   }

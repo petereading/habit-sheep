@@ -3,13 +3,16 @@
 #include <gtest/gtest.h>
 
 #include <cstdlib>
+#include <memory>
 
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
 #include "SheepMemoryGame.h"
+#include "SheepScene.h"
 #include "SheepStateStore.h"
 #include "components/HabitClock.h"
+#include "components/PopupCallback.h"
 
 unsigned long habitTestMillis = 0;
 bool habitTestSaveFailure = false;
@@ -433,4 +436,115 @@ TEST_F(HabitSheepTest, WeeklyFourCompletionsApportionExactlyTwentyOneGrass) {
   for (int i = 0; i < 4; ++i) ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
   EXPECT_EQ(SHEEP_STATE.getGrassStock(), 21);
   EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 21);
+}
+
+TEST_F(HabitSheepTest, HabitIconPersistsAndOlderOrInvalidValuesKeepAutomaticDefault) {
+  auto habit = *HABIT_SHEEP.findHabit("completion");
+  EXPECT_EQ(habit.icon, 255);
+  for (uint8_t icon = 0; icon < 24; ++icon) {
+    habit.icon = icon;
+    ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+    JsonDocument doc;
+    HABIT_SHEEP.toJson(doc);
+    ASSERT_TRUE(HABIT_SHEEP.fromJson(doc));
+    EXPECT_EQ(HABIT_SHEEP.findHabit("completion")->icon, icon);
+  }
+  habit.icon = 24;
+  ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+  EXPECT_EQ(HABIT_SHEEP.findHabit("completion")->icon, 255);
+  JsonDocument doc;
+  HABIT_SHEEP.toJson(doc);
+  doc["habits"][0]["icon"] = 254;
+  ASSERT_TRUE(HABIT_SHEEP.fromJson(doc));
+  EXPECT_EQ(HABIT_SHEEP.getHabits()[0].icon, 255);
+}
+
+TEST_F(HabitSheepTest, EatingSceneRequiresSuccessfullyPersistedCurrentMeal) {
+  stock(2);
+  halClock.now.tm_hour = 13;
+  halClock.now.tm_min = 0;
+  EXPECT_FALSE(SHEEP_STATE.ateCurrentMeal(halClock.now));
+  habitTestSaveFailure = true;
+  EXPECT_FALSE(SHEEP_STATE.settleDay());
+  EXPECT_FALSE(SHEEP_STATE.ateCurrentMeal(halClock.now));
+  habitTestSaveFailure = false;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_TRUE(SHEEP_STATE.ateCurrentMeal(halClock.now));
+  halClock.now.tm_min = 5;
+  EXPECT_FALSE(SHEEP_STATE.ateCurrentMeal(halClock.now));
+  stock(0);
+  halClock.now.tm_min = 0;
+  EXPECT_TRUE(SHEEP_STATE.settleDay());
+  EXPECT_TRUE(SHEEP_STATE.isResting());
+  EXPECT_FALSE(SHEEP_STATE.ateCurrentMeal(halClock.now));
+}
+
+TEST(SheepSceneTest, AwakePosesDoNotRepeatForTwoHoursAndRestHasPriority) {
+  tm local{};
+  bool seen[12]{};
+  for (int minute = 0; minute < 120; minute += 10) {
+    local.tm_hour = 10 + minute / 60;
+    local.tm_min = minute % 60;
+    const auto pose = sheepScene::pose(local, false, false, false);
+    EXPECT_LT(pose, 12);
+    EXPECT_FALSE(seen[pose]);
+    seen[pose] = true;
+  }
+  for (int minute = 0; minute < 120; minute += 30) {
+    local.tm_hour = 10 + minute / 60;
+    local.tm_min = minute % 60;
+    EXPECT_EQ(sheepScene::pose(local, true, false, false), 12 + minute / 30);
+    EXPECT_EQ(sheepScene::pose(local, false, true, false), 12 + minute / 30);
+  }
+  local.tm_hour = 13;
+  local.tm_min = 0;
+  EXPECT_EQ(sheepScene::pose(local, true, false, true), 16);
+  EXPECT_GE(sheepScene::pose(local, true, true, false), 12);
+  EXPECT_LT(sheepScene::pose(local, true, true, false), 16);
+  local.tm_min = 5;
+  EXPECT_LT(sheepScene::pose(local, true, false, true), 16);
+}
+
+TEST(SheepSceneTest, SleepWakeTargetsMealAndFiveMinuteReturnWithoutMinutePolling) {
+  tm local{};
+  local.tm_hour = 7;
+  local.tm_min = 59;
+  local.tm_sec = 59;
+  EXPECT_EQ(sheepScene::sleepSeconds(local), 1);
+  for (int hour : {8, 13, 19}) {
+    local.tm_hour = hour;
+    local.tm_min = 0;
+    local.tm_sec = 0;
+    EXPECT_EQ(sheepScene::sleepSeconds(local), 300);
+    local.tm_min = 4;
+    local.tm_sec = 59;
+    EXPECT_EQ(sheepScene::sleepSeconds(local), 1);
+    local.tm_min = 5;
+    local.tm_sec = 0;
+    EXPECT_EQ(sheepScene::sleepSeconds(local), 1500);
+  }
+  local.tm_hour = 23;
+  local.tm_min = 30;
+  EXPECT_EQ(sheepScene::sleepSeconds(local), 1800);
+}
+
+TEST(PopupCallbackTest, ReplacingCallbackKeepsExecutingCaptureAliveAndPreservesNextChoice) {
+  std::function<void(int)> slot;
+  auto capture = std::make_shared<int>(0);
+  std::weak_ptr<int> lifetime = capture;
+  int second = 0;
+  slot = [capture, &slot, &second](int choice) {
+    slot = [&second](int next) { second = next; };
+    *capture = choice;
+    EXPECT_EQ(capture.use_count(), 1);
+  };
+  capture.reset();
+  invokePopupChoice(slot, 7);
+  EXPECT_TRUE(lifetime.expired());
+  ASSERT_TRUE(slot);
+  invokePopupChoice(slot, 11);
+  EXPECT_EQ(second, 11);
+  EXPECT_FALSE(slot);
+  invokePopupChoice(slot, 12);
+  EXPECT_EQ(second, 11);
 }

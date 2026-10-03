@@ -12,6 +12,7 @@ class ActiveHabitsActivity final : public UiListActivity {
   ActiveHabitsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
   void onEnter() override;
+  void loop() override;
   void render(RenderLock&& lock) override;
 
  private:

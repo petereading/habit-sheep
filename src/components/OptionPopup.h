@@ -11,6 +11,8 @@
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
 #include "SheepStateStore.h"
+#include "components/HabitUi.h"
+#include "components/PopupCallback.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
 #include "fontIds.h"
@@ -29,6 +31,19 @@
 // publication so a release cannot be dropped during a highlight repaint.
 class OptionPopup {
  public:
+  void setHabitStyle(bool value = true) { habitStyle = value; }
+  void showInteractions(std::function<void(int)> callback) {
+    const char* options[] = {tr(STR_SHEEP_PET), tr(STR_SHEEP_CALL), tr(STR_SHEEP_MEMORY)};
+    show(tr(STR_SHEEP_INTERACT), options, 3, 0, std::move(callback));
+    iconMenu = true;
+  }
+  void showMinuteChoices(std::function<void(int)> callback) {
+    const char* options[] = {tr(STR_HABIT_PRESET_5),  tr(STR_HABIT_PRESET_10), tr(STR_HABIT_PRESET_15),
+                             tr(STR_HABIT_PRESET_20), tr(STR_HABIT_PRESET_30), tr(STR_HABIT_PRESET_45),
+                             tr(STR_HABIT_PRESET_60), tr(STR_HABIT_CUSTOM)};
+    show(tr(STR_HABIT_ADD_MINUTES), options, 8, 2, std::move(callback));
+    minuteMenu = true;
+  }
   void show(StrId titleId, const StrId* optionIds, int optionCount, int currentIndex,
             std::function<void(int)> onSelect) {
     title = I18N.get(titleId);
@@ -80,11 +95,16 @@ class OptionPopup {
       // first render after show() has populated the table (uiReady handshake).
       if (uiReady) {
         const freeink::ui::ActionEvent event = interactions.routePublished(snap);
+        if (event && event.action == ACTION_PAGE) {
+          selectedIndex = event.value;
+          requestUpdate();
+          return true;
+        }
         if (event && event.action == ACTION_OPTION) {
           // Tap released on an option: select it, fire, dismiss.
           selectedIndex = event.value;
           active = false;
-          if (onSelectCallback) onSelectCallback(selectedIndex);
+          invokePopupChoice(onSelectCallback, selectedIndex);
           requestUpdate();
           return true;
         }
@@ -125,7 +145,7 @@ class OptionPopup {
       return true;
     } else if (input.wasReleased(MappedInputManager::Button::Confirm)) {
       active = false;
-      if (onSelectCallback) onSelectCallback(selectedIndex);
+      invokePopupChoice(onSelectCallback, selectedIndex);
       requestUpdate();
       return true;
     } else if (input.wasReleased(MappedInputManager::Button::Back)) {
@@ -147,6 +167,42 @@ class OptionPopup {
 
   void render(const GfxRenderer& renderer) const {
     if (!active) return;
+    if (iconMenu || minuteMenu) {
+      const int w = renderer.getScreenWidth() - 48;
+      const int h = std::min(minuteMenu ? 390 : 220, renderer.getScreenHeight() - 90);
+      const int x = 24, y = (renderer.getScreenHeight() - h) / 2;
+      renderer.fillRoundedRect(x, y, w, h, 12, Color::White);
+      habitUi::frame(renderer, x, y, w, h);
+      renderer.drawCenteredText(NOTOSANS_14_FONT_ID, y + 14, title.c_str());
+      interactions.beginPublishCycle();
+      auto target = makeUiTarget(renderer);
+      const auto device = target.deviceContext();
+      const freeink::ui::InputSnapshot noInput{};
+      freeink::ui::Frame<INTERACTION_CAPACITY> frame(target, device, noInput, interactions);
+      frame.hit(freeink::ui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(w),
+                                  static_cast<int16_t>(h)},
+                ACTION_CHROME, 0, freeink::ui::InputTouch);
+      const int columns = minuteMenu ? 2 : 3, rows = minuteMenu ? 4 : 1, step = (w - 32) / columns;
+      const int tile = minuteMenu ? step - 10 : std::min(80, (w - 40) / 3), rowH = minuteMenu ? (h - 86) / 4 : 80;
+      for (int i = 0; i < columns * rows; ++i) {
+        const int px = x + 16 + (i % columns) * step + (step - tile) / 2, py = y + 52 + (i / columns) * rowH;
+        const int tileH = minuteMenu ? rowH - 8 : tile;
+        habitUi::frame(renderer, px, py, tile, tileH, i == selectedIndex);
+        if (minuteMenu)
+          renderer.drawText(NOTOSANS_14_FONT_ID,
+                            px + (tile - renderer.getTextWidth(NOTOSANS_14_FONT_ID, ownedStrings[i].c_str())) / 2,
+                            py + (tileH - renderer.getLineHeight(NOTOSANS_14_FONT_ID)) / 2, ownedStrings[i].c_str());
+        else
+          habitUi::interaction(renderer, i, px + (tile - 48) / 2, py + (tile - 48) / 2, 48);
+        frame.hit(freeink::ui::Rect{static_cast<int16_t>(px), static_cast<int16_t>(py), static_cast<int16_t>(tile),
+                                    static_cast<int16_t>(tileH)},
+                  ACTION_OPTION, i, freeink::ui::InputTouch);
+      }
+      if (iconMenu) renderer.drawCenteredText(SMALL_FONT_ID, y + h - 42, ownedStrings[selectedIndex].c_str());
+      interactions.publish();
+      uiReady = true;
+      return;
+    }
     namespace fui = freeink::ui;
 
     // Per-render target: a GfxRendererTarget is a renderer reference plus
@@ -171,22 +227,14 @@ class OptionPopup {
 
     const auto& metrics = UITheme::getInstance().getMetrics();
     const int totalOptions = static_cast<int>(ownedStrings.size());
-    const uint8_t count = static_cast<uint8_t>(totalOptions > MAX_OPTIONS ? MAX_OPTIONS : totalOptions);
-
-    fui::DialogOption options[MAX_OPTIONS];
-    for (uint8_t i = 0; i < count; ++i) {
-      options[i].label = ownedStrings[i].c_str();
-      options[i].action = ACTION_OPTION;
-      options[i].value = static_cast<int16_t>(i);
-      options[i].state = (i == selectedIndex) ? fui::StateFocused : fui::StateNormal;
-    }
+    uint8_t count = static_cast<uint8_t>(totalOptions > MAX_OPTIONS ? MAX_OPTIONS : totalOptions);
 
     fui::OptionDialogProps props;
     props.title = title.c_str();
     props.headline = headline.empty() ? nullptr : headline.c_str();
     props.message = grassBadge ? rewardText : nullptr;
-    props.contentHeight = grassBadge ? 40 : 0;
-    props.options = options;
+    props.contentHeight = grassBadge ? 100 : 0;
+    props.options = optionRows;
     props.optionCount = count;
     props.verticalOptions = true;
     // Touch only: physical buttons stay on the legacy wrap/confirm path above,
@@ -229,6 +277,25 @@ class OptionPopup {
     const fui::Rect screen = device.screen();
     const int16_t width =
         fui::clampI16(std::min<int>(screen.width * 3 / 4, screen.width - metrics.optionPopupDialogSideMargin * 2));
+    // Keep every selectable row on screen, including nine-habit pickers in landscape.
+    const auto populate = [&] {
+      const int first = (selectedIndex / count) * count;
+      props.optionCount = std::min<int>(count, std::min(totalOptions, MAX_OPTIONS) - first);
+      for (int i = 0; i < props.optionCount; ++i) {
+        const int index = first + i;
+        optionRows[i].label = ownedStrings[index].c_str();
+        optionRows[i].action = ACTION_OPTION;
+        optionRows[i].value = static_cast<int16_t>(index);
+        optionRows[i].state = index == selectedIndex ? fui::StateFocused : fui::StateNormal;
+      }
+    };
+    populate();
+    while (count > 1 &&
+           fui::optionDialogHeight(target, props, width) > screen.height - metrics.buttonHintsHeight - 24) {
+      --count;
+      if (!grassBadge) props.contentHeight = 44;
+      populate();
+    }
     const int16_t height = fui::clampI16(fui::optionDialogHeight(target, props, width), 0, screen.height);
     const fui::Rect dialogRect = fui::centeredRect(screen, fui::Size{width, height});
 
@@ -236,7 +303,11 @@ class OptionPopup {
     // option buttons win inside the dialog and the guard absorbs the rest.
     frame.hit(dialogRect, ACTION_CHROME, 0, fui::InputTouch);
     const fui::Rect content = fui::optionDialog(frame, dialogRect, props);
+    if (habitStyle)
+      renderer.drawRoundedRect(dialogRect.x + 5, dialogRect.y + 5, dialogRect.width - 10, dialogRect.height - 10, 1, 8,
+                               true);
     if (grassBadge) {
+      habitUi::sheep(renderer, content.x + (content.width - 80) / 2, content.y, 80, 60, 2);
       char amount[20];
       if (grassGain)
         snprintf(amount, sizeof(amount), "+%u", static_cast<unsigned>(grassGain));
@@ -245,11 +316,21 @@ class OptionPopup {
                  static_cast<unsigned>(SheepStateStore::GRASS_CAP));
       const int amountW = renderer.getTextWidth(NOTOSANS_14_FONT_ID, amount);
       const int x = content.x + (content.width - amountW - 38) / 2;
-      const int y = content.y + 2;
+      const int y = content.y + 62;
       renderer.drawLine(x + 14, y + 32, x + 14, y + 4, 2, true);
       renderer.drawLine(x + 14, y + 23, x + 3, y + 13, 2, true);
       renderer.drawLine(x + 14, y + 16, x + 25, y + 7, 2, true);
       renderer.drawText(NOTOSANS_14_FONT_ID, x + 38, y + 4, amount);
+    } else if (count < std::min(totalOptions, MAX_OPTIONS)) {
+      const int first = (selectedIndex / count) * count;
+      const int step = content.width / 2;
+      for (int i = 0; i < 2; ++i) {
+        const int px = content.x + i * step;
+        renderer.drawText(SMALL_FONT_ID, px + 8, content.y + 8, tr(i ? STR_HABIT_NEXT : STR_HABIT_PREVIOUS));
+        frame.hit(fui::Rect{static_cast<int16_t>(px), content.y, static_cast<int16_t>(step), 44}, ACTION_PAGE,
+                  i ? std::min(std::min(totalOptions, MAX_OPTIONS) - 1, first + count) : std::max(0, first - count),
+                  fui::InputTouch);
+      }
     }
     // Atomically make this generation the one handleInput() reads, now that
     // every hit() call for this frame is done.
@@ -276,16 +357,17 @@ class OptionPopup {
   }
 
  private:
-  // The dialog has no scrolling, so options past MAX_OPTIONS would render off
-  // screen anyway; a fixed cap keeps the DialogOption array on the stack and
-  // the interaction table small. +1 slot for the chrome guard rect.
+  // Bounded screen-lifetime row storage plus chrome and two touch paging targets.
   static constexpr int MAX_OPTIONS = 16;
-  static constexpr size_t INTERACTION_CAPACITY = MAX_OPTIONS + 1;
+  static constexpr size_t INTERACTION_CAPACITY = MAX_OPTIONS + 3;
   static constexpr freeink::ui::ActionId ACTION_OPTION = 1;
   static constexpr freeink::ui::ActionId ACTION_CHROME = 2;
+  static constexpr freeink::ui::ActionId ACTION_PAGE = 3;
 
   void activate(int currentIndex, std::function<void(int)> onSelect) {
     grassBadge = false;
+    iconMenu = false;
+    minuteMenu = false;
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
     selectedIndex = currentIndex >= 0 && currentIndex < count ? currentIndex : 0;
     onSelectCallback = std::move(onSelect);
@@ -294,6 +376,9 @@ class OptionPopup {
   }
 
   bool active = false;
+  bool habitStyle = false;
+  bool iconMenu = false;
+  bool minuteMenu = false;
   bool grassBadge = false;
   uint16_t grassGain = 0;
   uint8_t grassStock = 0;
@@ -306,5 +391,7 @@ class OptionPopup {
   // Written by the render task (frame registration), routed by the loop task;
   // uiReady closes the rebuild window exactly like UiListActivity::uiReady.
   mutable freeink::ui::InteractionBuffer<INTERACTION_CAPACITY> interactions;
+  // Screen-lifetime rows avoid a large array on the embedded render-task stack.
+  mutable freeink::ui::DialogOption optionRows[MAX_OPTIONS]{};
   mutable std::atomic<bool> uiReady{false};
 };

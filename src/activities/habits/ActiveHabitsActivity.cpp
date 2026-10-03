@@ -19,8 +19,14 @@ ActiveHabitsActivity::ActiveHabitsActivity(GfxRenderer& renderer, MappedInputMan
 }
 
 void ActiveHabitsActivity::onEnter() {
+  picker.setHabitStyle();
   UiListActivity::onEnter();
   refreshRows();
+}
+
+void ActiveHabitsActivity::loop() {
+  RenderLock lock;
+  UiListActivity::loop();
 }
 
 void ActiveHabitsActivity::refreshRows() {

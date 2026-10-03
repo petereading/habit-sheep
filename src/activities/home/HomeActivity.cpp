@@ -27,6 +27,8 @@
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
 #include "SheepStateStore.h"
+#include "activities/habits/GrassHistoryActivity.h"
+#include "activities/habits/HabitCountActivity.h"
 #include "activities/habits/HabitDurationActivity.h"
 #include "activities/habits/SheepMemoryActivity.h"
 #include "components/HabitReward.h"
@@ -245,6 +247,7 @@ void HomeActivity::onEnter() {
   // semantics stay unchanged. Fall back to the upstream home on allocation failure.
   habitSheepUi = makeUniqueNoThrow<HabitSheepHomeUi>(renderer);
   if (habitSheepUi) {
+    habitReplacementPopup.setHabitStyle();
     loadRecentBooks(1);
     hasContinueReading = !recentBooks.empty();
     if (!HABIT_SHEEP.isEnabled())
@@ -370,12 +373,11 @@ void HomeActivity::activateHabitSheepSelection() {
         else
           onFileBrowserOpen();
       } else if (!SHEEP_STATE.isForaging()) {
-        const char* options[] = {tr(STR_SHEEP_PET), tr(STR_SHEEP_MEMORY), tr(STR_CANCEL)};
-        habitReplacementPopup.show(tr(STR_HABIT_SHEEP), options, 3, 0, [this](int selected) {
-          if (selected == 0) {
+        habitReplacementPopup.showInteractions([this](int selected) {
+          if (selected == 0 || selected == 1) {
             SHEEP_STATE.recordInteraction();
-            habitSheepUi->nudgeSheep();
-          } else if (selected == 1) {
+            habitSheepUi->nudgeSheep(static_cast<uint8_t>(selected));
+          } else if (selected == 2) {
             // ActivityManager owns the single screen-lifetime game allocation.
             auto game = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
             if (game)
@@ -402,23 +404,8 @@ void HomeActivity::activateHabitSheepSelection() {
       if (!habit) break;
 
       if (habit->type == HabitType::Completion) {
-        const uint16_t count = habit->period == HabitPeriod::Weekly
-                                   ? HABIT_EVENTS.completionCountForWeek(habit->id)
-                                   : HABIT_EVENTS.progressForToday(habit->id).completionCount;
-        char headline[128];
-        snprintf(headline, sizeof(headline), tr(STR_HABIT_CONFIRM_PROGRESS), habit->name.c_str(),
-                 static_cast<unsigned>(count), static_cast<unsigned>(habit->targetCount),
-                 habit->period == HabitPeriod::Weekly ? tr(STR_HABIT_WEEKLY) : tr(STR_HABIT_DAILY));
-        const char* options[] = {tr(STR_CANCEL), tr(STR_HABIT_LOG_ONE)};
-        habitReplacementPopup.show(tr(STR_HABIT_CONFIRM_DONE), headline, options, 2, 0,
-                                   [this, id = habit->id](const int selected) {
-                                     if (selected != 1) return;
-                                     if (HABIT_EVENTS.appendCompletion(id)) {
-                                       habitSheepUi->nudgeSheep();
-                                       requestUpdate();
-                                     }
-                                   });
-        requestUpdate();
+        auto detail = makeUniqueNoThrow<HabitCountActivity>(renderer, mappedInput, habit->id);
+        if (detail) activityManager.pushActivity(std::move(detail));
       } else {
         auto detail = makeUniqueNoThrow<HabitDurationActivity>(renderer, mappedInput, habit->id);
         if (detail) activityManager.pushActivity(std::move(detail));
@@ -448,6 +435,11 @@ void HomeActivity::activateHabitSheepSelection() {
       activityManager.goToSettings(4);
       break;
     }
+    case HabitSheepHomeUi::Action::GrassHistory: {
+      auto history = makeUniqueNoThrow<GrassHistoryActivity>(renderer, mappedInput);
+      if (history) activityManager.pushActivity(std::move(history));
+      break;
+    }
     case HabitSheepHomeUi::Action::None:
       break;
   }
@@ -455,6 +447,8 @@ void HomeActivity::activateHabitSheepSelection() {
 
 void HomeActivity::loopHabitSheepHome() {
   if (!habitSheepUi) return;
+  RenderLock lock;
+  if (habitSheepUi->expireNudge()) requestUpdate();
   if (lastHabitModeRevision != HABIT_SHEEP.getModeRevision()) {
     lastHabitModeRevision = HABIT_SHEEP.getModeRevision();
     selectorIndex = 0;

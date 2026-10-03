@@ -1407,6 +1407,9 @@ void CrossPointWebServer::handlePostHabitSheep() {
       habit.sessionsPerCycle = static_cast<uint8_t>(sessions);
       habit.period = strcmp(period, "weekly") == 0 ? HabitPeriod::Weekly : HabitPeriod::Daily;
       habit.targetCount = static_cast<uint8_t>(targetCount);
+      const auto* existing = HABIT_SHEEP.findHabit(habit.id);
+      const int icon = doc["icon"] | (existing ? existing->icon : 255);
+      habit.icon = icon >= 0 && icon < 24 ? static_cast<uint8_t>(icon) : 255;
       valid = HABIT_SHEEP.upsertHabit(habit);
     }
   } else if (strcmp(action, "deleteHabit") == 0) {

@@ -22,6 +22,7 @@ struct HabitDefinition {
   uint8_t sessionsPerCycle = 4;
   HabitPeriod period = HabitPeriod::Daily;
   uint8_t targetCount = 1;
+  uint8_t icon = 255;  // Unset legacy icons derive from the habit type.
 };
 
 class HabitSheepStore : public PersistableStore<HabitSheepStore> {

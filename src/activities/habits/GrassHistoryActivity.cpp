@@ -9,6 +9,7 @@
 
 #include "I18n.h"
 #include "SheepStateStore.h"
+#include "components/HabitUi.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -18,12 +19,21 @@ void GrassHistoryActivity::onEnter() {
 }
 
 void GrassHistoryActivity::loop() {
+  RenderLock lock;
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     finish();
   } else if (mappedInput.wasReleased(MappedInputManager::Button::NavPrevious) && page > 0) {
     --page;
     requestUpdate();
   } else if (mappedInput.wasReleased(MappedInputManager::Button::NavNext) && page < 1) {
+    ++page;
+    requestUpdate();
+  }
+  if (mappedInput.wasTapInRect(24, renderer.getScreenHeight() - 95, 140, 40) && page > 0) {
+    --page;
+    requestUpdate();
+  }
+  if (mappedInput.wasTapInRect(renderer.getScreenWidth() - 164, renderer.getScreenHeight() - 95, 140, 40) && page < 1) {
     ++page;
     requestUpdate();
   }
@@ -42,16 +52,17 @@ void GrassHistoryActivity::render(RenderLock&&) {
   snprintf(stock, sizeof(stock), tr(STR_SHEEP_GRASS_STOCK), static_cast<unsigned>(SHEEP_STATE.getGrassStock()),
            static_cast<unsigned>(SheepStateStore::GRASS_CAP));
   const int top = safe.y + metrics.topPadding + metrics.headerHeight + 15;
+  habitUi::grass(renderer, left, top, 32);
   renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top, stock);
   renderer.drawCenteredText(SMALL_FONT_ID, top + 30, tr(STR_GRASS_HISTORY_HINT));
   renderer.drawCenteredText(SMALL_FONT_ID, top + 50, tr(STR_GRASS_MEALS));
 
   tm today{};
   if (!halClock.isAvailable() || !halClock.localTime(today)) {
-    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top + 65, tr(STR_GRASS_CLOCK_UNAVAILABLE));
+    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top + 85, tr(STR_GRASS_CLOCK_UNAVAILABLE));
   } else {
     const bool compact = renderer.getScreenHeight() <= 600;
-    const int rowH = compact ? 38 : 68;
+    const int rowH = std::min(compact ? 38 : 68, (renderer.getScreenHeight() - top - 180) / 7);
     const int listTop = top + (compact ? 78 : 85);
     for (int i = 0; i < 7; ++i) {
       tm day = today;
@@ -72,11 +83,16 @@ void GrassHistoryActivity::render(RenderLock&&) {
                  static_cast<unsigned>(entry.eaten));
       else
         snprintf(amounts, sizeof(amounts), "%s", tr(STR_GRASS_NO_ENTRY));
-      if (entry.paused) renderer.drawText(SMALL_FONT_ID, left + 140, y + 2, tr(STR_GRASS_PAUSED));
+      if (entry.paused) renderer.drawText(SMALL_FONT_ID, safe.x + safe.width / 2 - 30, y + 2, tr(STR_GRASS_PAUSED));
       renderer.drawText(NOTOSANS_14_FONT_ID, right - renderer.getTextWidth(NOTOSANS_14_FONT_ID, amounts), y, amounts);
-      if (i < 6) renderer.drawLine(left, y + rowH - 8, right, y + rowH - 8, true);
+      if (i < 6) renderer.drawLine(left, y + rowH - 2, right, y + rowH - 2, true);
     }
   }
+  habitUi::frame(renderer, 24, renderer.getScreenHeight() - 95, 140, 38, false);
+  habitUi::frame(renderer, renderer.getScreenWidth() - 164, renderer.getScreenHeight() - 95, 140, 38, false);
+  renderer.drawText(SMALL_FONT_ID, 35, renderer.getScreenHeight() - 87, tr(STR_GRASS_NEWER));
+  renderer.drawText(SMALL_FONT_ID, renderer.getScreenWidth() - 153, renderer.getScreenHeight() - 87,
+                    tr(STR_GRASS_OLDER));
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), "", tr(STR_GRASS_NEWER), tr(STR_GRASS_OLDER));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);

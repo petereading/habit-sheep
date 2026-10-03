@@ -5,6 +5,7 @@
 
 #include "I18n.h"
 #include "SheepStateStore.h"
+#include "components/HabitUi.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -25,6 +26,7 @@ void SheepMemoryActivity::select() {
 }
 
 void SheepMemoryActivity::loop() {
+  RenderLock lock;
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     finish();
     return;
@@ -64,18 +66,18 @@ void SheepMemoryActivity::render(RenderLock&&) {
     const int cx = x + (cardW - 8) / 2;
     const int cy = y + (cardH - 8) / 2;
     if (game.shown(i)) {
-      // Four sheep silhouettes, identified by their ear marks for monochrome e-ink.
-      renderer.drawRoundedRect(cx - 22, cy - 20, 40, 30, 2, 10, true);
-      renderer.fillRoundedRect(cx + 10, cy - 12, 18, 22, 6, Color::Black);
-      renderer.drawLine(cx - 12, cy + 10, cx - 12, cy + 24, 2, true);
-      renderer.drawLine(cx + 8, cy + 10, cx + 8, cy + 24, 2, true);
-      char mark[2] = {static_cast<char>('1' + game.value(i)), 0};
-      renderer.drawText(SMALL_FONT_ID, cx - 4, cy - 13, mark);
+      habitUi::sheep(renderer, x + 4, y + 4, cardW - 16, cardH - 16, 0, game.value(i));
     } else {
-      renderer.drawLine(cx, cy - 18, cx, cy + 18, 2, true);
-      renderer.drawLine(cx, cy - 4, cx - 12, cy - 15, 2, true);
-      renderer.drawLine(cx, cy + 3, cx + 12, cy - 8, 2, true);
+      habitUi::icon(renderer, 15, cx - 24, cy - 24, 48);
     }
+  }
+  if (game.complete()) {
+    const int w = renderer.getScreenWidth() - 64, y = renderer.getScreenHeight() / 2 - 100;
+    renderer.fillRoundedRect(32, y, w, 180, 12, Color::White);
+    habitUi::frame(renderer, 32, y, w, 180);
+    habitUi::sheep(renderer, renderer.getScreenWidth() / 2 - 60, y + 16, 120, 90, 2);
+    UITheme::drawCenteredWrappedText(renderer, Rect{48, y + 112, w - 32, 58}, SMALL_FONT_ID, tr(STR_SHEEP_MEMORY_DONE),
+                                     2);
   }
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);

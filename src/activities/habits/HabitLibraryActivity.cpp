@@ -1,14 +1,17 @@
 #include "HabitLibraryActivity.h"
 
 #include <GfxRenderer.h>
+#include <Memory.h>
 #include <esp_random.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <utility>
 
+#include "HabitIconActivity.h"
 #include "I18n.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "components/HabitUi.h"
 #include "components/UITheme.h"
 
 namespace fui = freeink::ui;
@@ -17,8 +20,14 @@ HabitLibraryActivity::HabitLibraryActivity(GfxRenderer& renderer, MappedInputMan
     : UiListActivity("HabitLibrary", renderer, mappedInput) {}
 
 void HabitLibraryActivity::onEnter() {
+  popup.setHabitStyle();
   UiListActivity::onEnter();
   rebuildRows();
+}
+
+void HabitLibraryActivity::loop() {
+  RenderLock lock;
+  UiListActivity::loop();
 }
 
 void HabitLibraryActivity::rebuildRows() {
@@ -62,14 +71,20 @@ void HabitLibraryActivity::rebuildRows() {
 
 void HabitLibraryActivity::startAddHabit() {
   auto handler = [this](const ActivityResult& result) {
+    RenderLock lock;
     if (result.isCancelled) return;
     const auto& kb = std::get<KeyboardResult>(result.data);
     if (kb.text.empty()) return;
     pendingName = kb.text;
     chooseNewHabitType();
   };
-  startActivityForResult(
-      std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Habit name", "", 64, InputType::Text), handler);
+  auto keyboard =
+      makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, "Habit name", "", 64, InputType::Text);
+  if (!keyboard) {
+    LOG_ERR("HABIT", "OOM: habit keyboard");
+    return;
+  }
+  startActivityForResult(std::move(keyboard), handler);
 }
 
 void HabitLibraryActivity::chooseNewHabitType() {
@@ -140,21 +155,49 @@ void HabitLibraryActivity::savePendingHabit(const bool readingIntegration) {
   habit.readingIntegration = pendingType == HabitType::Duration && readingIntegration;
   habit.period = pendingPeriod;
   habit.targetCount = pendingTargetCount;
-
-  if (HABIT_SHEEP.upsertHabit(habit)) {
-    // Fill the first empty active slot. Users can immediately use the habit,
-    // while still retaining explicit 3-slot control in Active Habits.
-    auto active = HABIT_SHEEP.getActiveHabitIds();
-    for (int i = 0; i < static_cast<int>(active.size()); ++i) {
-      if (active[i].empty()) {
-        HABIT_SHEEP.setActiveHabit(i, habit.id);
-        break;
+  auto picker = makeUniqueNoThrow<HabitIconActivity>(renderer, mappedInput, habitUi::iconFor(habit));
+  if (!picker) {
+    LOG_ERR("HABIT", "OOM: icon picker");
+    return;
+  }
+  startActivityForResult(std::move(picker), [this, habit](const ActivityResult& result) mutable {
+    RenderLock lock;
+    if (result.isCancelled) return;
+    habit.icon = static_cast<uint8_t>(std::get<IntervalResult>(result.data).value);
+    if (HABIT_SHEEP.upsertHabit(habit)) {
+      // Fill the first empty active slot. Users can immediately use the habit,
+      // while still retaining explicit 3-slot control in Active Habits.
+      auto active = HABIT_SHEEP.getActiveHabitIds();
+      for (int i = 0; i < static_cast<int>(active.size()); ++i) {
+        if (active[i].empty()) {
+          HABIT_SHEEP.setActiveHabit(i, habit.id);
+          break;
+        }
       }
     }
+    pendingName.clear();
+    rebuildRows();
+    requestUpdate();
+  });
+}
+
+void HabitLibraryActivity::changeIcon(const std::string& id) {
+  const auto* found = HABIT_SHEEP.findHabit(id);
+  if (!found) return;
+  auto habit = *found;
+  auto picker = makeUniqueNoThrow<HabitIconActivity>(renderer, mappedInput, habitUi::iconFor(habit));
+  if (!picker) {
+    LOG_ERR("HABIT", "OOM: icon picker");
+    return;
   }
-  pendingName.clear();
-  rebuildRows();
-  requestUpdate();
+  startActivityForResult(std::move(picker), [this, habit](const ActivityResult& result) mutable {
+    RenderLock lock;
+    if (!result.isCancelled) {
+      habit.icon = static_cast<uint8_t>(std::get<IntervalResult>(result.data).value);
+      HABIT_SHEEP.upsertHabit(habit);
+      rebuildRows();
+    }
+  });
 }
 
 void HabitLibraryActivity::renameHabit(const std::string& habitId) {
@@ -162,6 +205,7 @@ void HabitLibraryActivity::renameHabit(const std::string& habitId) {
   if (!found) return;
   HabitDefinition original = *found;
   auto handler = [this, original](const ActivityResult& result) mutable {
+    RenderLock lock;
     if (result.isCancelled) return;
     const auto& kb = std::get<KeyboardResult>(result.data);
     if (kb.text.empty()) return;
@@ -170,9 +214,13 @@ void HabitLibraryActivity::renameHabit(const std::string& habitId) {
     rebuildRows();
     requestUpdate();
   };
-  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, "Rename habit", original.name,
-                                                                 64, InputType::Text),
-                         handler);
+  auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, "Rename habit", original.name, 64,
+                                                           InputType::Text);
+  if (!keyboard) {
+    LOG_ERR("HABIT", "OOM: rename keyboard");
+    return;
+  }
+  startActivityForResult(std::move(keyboard), handler);
 }
 
 void HabitLibraryActivity::changeTarget(const std::string& habitId) {
@@ -305,8 +353,9 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
                              tr(STR_HABIT_SHORT_BREAK),
                              tr(STR_HABIT_LONG_BREAK),
                              tr(STR_HABIT_FOCUS_SESSIONS),
-                             "Delete"};
-    popup.show(habit->name.c_str(), OPTIONS, 6, 0, [this, habitId](const int index) {
+                             "Delete",
+                             tr(STR_HABIT_ICON)};
+    popup.show(habit->name.c_str(), OPTIONS, 7, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -319,10 +368,12 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         changePomodoroSessions(habitId);
       else if (index == 5)
         confirmDelete(habitId);
+      else if (index == 6)
+        changeIcon(habitId);
     });
   } else if (habit->type == HabitType::Duration) {
-    const char* OPTIONS[] = {"Rename", "Change target", tr(STR_HABIT_AUTO_READING), "Delete"};
-    popup.show(habit->name.c_str(), OPTIONS, 4, 0, [this, habitId](const int index) {
+    const char* OPTIONS[] = {"Rename", "Change target", tr(STR_HABIT_AUTO_READING), "Delete", tr(STR_HABIT_ICON)};
+    popup.show(habit->name.c_str(), OPTIONS, 5, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -331,10 +382,12 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         toggleReadingIntegration(habitId);
       else if (index == 3)
         confirmDelete(habitId);
+      else if (index == 4)
+        changeIcon(habitId);
     });
   } else {
-    const char* OPTIONS[] = {"Rename", tr(STR_HABIT_PERIOD), tr(STR_HABIT_TARGET_COUNT), "Delete"};
-    popup.show(habit->name.c_str(), OPTIONS, 4, 0, [this, habitId](const int index) {
+    const char* OPTIONS[] = {"Rename", tr(STR_HABIT_PERIOD), tr(STR_HABIT_TARGET_COUNT), "Delete", tr(STR_HABIT_ICON)};
+    popup.show(habit->name.c_str(), OPTIONS, 5, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -343,6 +396,8 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         changeCompletionTarget(habitId);
       else if (index == 3)
         confirmDelete(habitId);
+      else if (index == 4)
+        changeIcon(habitId);
     });
   }
   requestUpdate();

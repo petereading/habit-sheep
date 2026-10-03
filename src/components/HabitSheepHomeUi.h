@@ -21,9 +21,10 @@ class HabitSheepHomeUi {
     Opds,
     Transfer,
     Settings,
+    GrassHistory,
   };
 
-  static constexpr int SELECTION_COUNT = 10;
+  static constexpr int SELECTION_COUNT = 11;
 
   explicit HabitSheepHomeUi(GfxRenderer& renderer) : renderer(renderer) {}
 
@@ -36,15 +37,17 @@ class HabitSheepHomeUi {
   void renderUi(const HabitSheepStore& store, bool showDock = true, const RecentBook* book = nullptr) const;
   void renderSleepUi(const HabitSheepStore& store) const;
 
-  void nudgeSheep() { sheepNudge = static_cast<uint8_t>((sheepNudge + 1) % 3); }
+  void nudgeSheep(uint8_t action);
+  bool expireNudge();
 
  private:
   GfxRenderer& renderer;
   int selection = 0;
   uint8_t sheepNudge = 0;
+  unsigned long nudgeStartedMs = 0;
 
   void drawSheep(int x, int y, int width, int height, const char* name, bool showSelection = true) const;
   void drawPasture(int x, int y, int width, int height) const;
-  void drawHabitRows(const HabitSheepStore& store, int top, int height) const;
+  void drawHabitRows(const HabitSheepStore& store, int top, int height, bool passive = false) const;
   void drawDock(int top, int height) const;
 };

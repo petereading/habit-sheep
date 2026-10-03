@@ -34,5 +34,6 @@ class HabitDurationActivity final : public Activity {
   void activate();
   void showAddMinutes();
   void showCustomMinutes();
+  void confirmMinutes(uint16_t minutes);
   void continueReading();
 };
