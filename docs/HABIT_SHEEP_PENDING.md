@@ -57,9 +57,20 @@ Status: implemented 2026-10-04 for the next X3 firmware test; hardware verificat
 
 Source checks: `HabitSheepHomeUi.cpp` explicitly selects fixed font IDs for Home text; `UIScale.h` also defines one fixed UI tier. Home does not follow the reader's selected font size. The reported overlap should be addressed as layout/padding, rather than attributed to the user's font preference. Habit-caption height now determines its band spacing, leaving twelve pixels before the separate status/focus row. Hardware validation is still required.
 
+## Pending second X3 feedback batch — 2026-10-04
+
+Status: record only. P-028–P-031 are not implemented in firmware `d3030aa`; no code change, build or new firmware is requested for this update.
+
+| ID | Pending request | Acceptance notes |
+| --- | --- | --- |
+| P-028 | Add orientation selection in Settings → Habits, with the same four choices as reading. | Portrait, Landscape CW, Portrait 180°, Landscape CCW. Provide an actual on-device orientation entry for Habit Sheep Home/habit screens; keep the reading orientation setting independent. Check navigation transitions, return from reading and Habit Sheep sleep rendering. Current `Reading Orientation` only applies to readers; `ReaderActivity::onExit()` restores Portrait. Host-rendered landscape checks do not mean Home currently has a usable landscape switch. |
+| P-029 | Make the Home sheep slightly smaller and keep its selection frame clear of the dock separator. | Reduce the sheep artwork size and separately inset/resize its focus rectangle so its bottom edge does not touch or overlap the horizontal divider above the six dock icons. Do not rely on shrinking the artwork alone, because the current frame encloses the entire sheep scene. Retain single-outline focus. |
+| P-030 | Remove the ground beneath the sheep entirely. | Supersedes the curved-ground treatment in P-024. No ground line or contact shadow on Home or Habit Sheep sleep scenes; retain no decorative grass. Keep the foraging notice legible. |
+| P-031 | Show grass stock on the Habit Sheep sleep screen, using the same representation as Home. | Seven right-aligned grass symbols, each containing three independently filled/empty blades. One blade represents one grass unit; cap remains 21. Keep hearts and date/battery clear, including after scheduled meals. This is a passive sleep display, not an interactive history shortcut. Existing meal accounting and sleep refresh rules stay unchanged. |
+
 ## X3 verification checklist
 
-1. Check larger unframed habit icons, single-outline focus and double-outline popups. Check long names/labels, battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses; confirm no overlap or clipping. Navigate all three top slots, grass, sheep and six dock entries; test an empty slot and long-press replacement. Check portrait, inverted portrait and both landscapes.
+1. Check larger unframed habit icons, single-outline focus and double-outline popups. Check long names/labels, battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses; confirm no overlap or clipping. Navigate all three top slots, grass, sheep and six dock entries; test an empty slot and long-press replacement. Home/habit orientation hardware tests beyond Portrait await P-028; the current reading-only orientation setting does not rotate Home.
 2. Open grass history directly from Home. Check both seven-day pages, earned/eaten amounts, paused markers and the current stock. Preserve existing records after firmware update.
 3. Create/edit a custom habit and select icons on both pages. Restart; confirm choices survive. Test Family/Relationship/Money/Phone and generic icons.
 4. Combine device reading, paper-book timer and confirmed manual additions. Verify one total, Cancel has no effect, target reward is only once, and timing may continue beyond target.
