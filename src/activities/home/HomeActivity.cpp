@@ -31,6 +31,7 @@
 #include "activities/habits/HabitCountActivity.h"
 #include "activities/habits/HabitDurationActivity.h"
 #include "activities/habits/SheepMemoryActivity.h"
+#include "activities/reader/ReaderUtils.h"
 #include "components/HabitReward.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -236,6 +237,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 }
 
 void HomeActivity::onEnter() {
+  ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation());
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();

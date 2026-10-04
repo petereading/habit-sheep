@@ -842,6 +842,10 @@
         return '<option value="' + index + '"' + (habitSheep.weekStart === index ? ' selected' : '') + '>' + day + '</option>';
       }).join('') + '</select></div>' +
       '<h3>Active habits (maximum 3)</h3>';
+    html += '<div class="setting-row"><span class="setting-name">Habits Orientation</span><select onchange="saveHabitOrientation(this.value)">' +
+      ['Portrait','Landscape CW','Portrait 180°','Landscape CCW'].map(function(name,index) {
+        return '<option value="' + index + '"' + ((habitSheep.orientation || 0) === index ? ' selected' : '') + '>' + name + '</option>';
+      }).join('') + '</select></div>';
     for (let slot = 0; slot < 3; slot++) {
       html += '<div class="setting-row"><span class="setting-name">Slot ' + (slot + 1) + '</span>' +
         '<span class="setting-control"><select onchange="saveActiveHabit(' + slot + ',this.value)">' +
@@ -858,8 +862,9 @@
     habitSheep.habits.forEach(function(habit, index) {
       html += '<div class="setting-row"><span class="setting-name">' + escapeHtml(habit.name) +
         ' · ' + (habit.type === 'pomodoro' ? habit.targetMinutes + '/' + habit.shortBreakMinutes + '/' +
-        habit.longBreakMinutes + ' min · ' + habit.sessionsPerCycle + ' focus sessions' :
-        habit.type === 'duration' ? habit.targetMinutes + ' min' :
+        habit.longBreakMinutes + ' min · ' + habit.sessionsPerCycle + ' focuses before long break' :
+        habit.type === 'duration' ? (habit.targetCount || 1) + ' sessions per ' +
+        (habit.period === 'weekly' ? 'week' : 'day') + ' · ' + habit.targetMinutes + ' min/session' :
         (habit.targetCount || 1) + ' per ' + (habit.period === 'weekly' ? 'week' : 'day')) +
         '</span><span class="setting-control"><button onclick="editHabit(' + index + ')">Edit</button> ' +
         '<button onclick="deleteHabit(' + index + ')">Delete</button></span></div>';
@@ -873,15 +878,15 @@
       ['Reading','Pomodoro','Writing','Study','Walking','Running','Strength','Drink water','Rest','Meditation','Meals','Cleaning','Music','Painting','Plant care','Star','Family','Relationship','Money','Phone','Flag','Target','Check','Sun'].map(function(name,index) { return '<option value="' + index + '">' + name + '</option>'; }).join('') + '</select></div>' +
       '<div class="setting-row" id="habit-period-row"><span class="setting-name">Period</span>' +
       '<select id="habit-period"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div>' +
-      '<div class="setting-row" id="habit-count-row"><span class="setting-name">Times per period</span>' +
+      '<div class="setting-row" id="habit-count-row"><span class="setting-name" id="habit-count-label">Target per period</span>' +
       '<input id="habit-count" type="number" min="1" max="99" value="1"></div>' +
-      '<div class="setting-row" id="habit-target-row"><span class="setting-name" id="habit-target-label">Daily target (minutes)</span>' +
+      '<div class="setting-row" id="habit-target-row"><span class="setting-name" id="habit-target-label">Minutes per session</span>' +
       '<input id="habit-target" type="number" min="1" max="1440" value="25"></div>' +
       '<div class="setting-row" id="habit-short-break-row"><span class="setting-name">Short break (minutes)</span>' +
       '<input id="habit-short-break" type="number" min="1" max="120" value="5"></div>' +
       '<div class="setting-row" id="habit-long-break-row"><span class="setting-name">Long break (minutes)</span>' +
       '<input id="habit-long-break" type="number" min="1" max="120" value="15"></div>' +
-      '<div class="setting-row" id="habit-sessions-row"><span class="setting-name">Focus sessions per cycle</span>' +
+      '<div class="setting-row" id="habit-sessions-row"><span class="setting-name">Focuses before long break (not a daily target)</span>' +
       '<input id="habit-sessions" type="number" min="1" max="12" value="4"></div>' +
       '<div class="setting-row" id="habit-reading-row"><span class="setting-name">Count time in the reader automatically ' +
       '(manual timer and manual minutes remain available)</span>' +
@@ -911,10 +916,11 @@
   function updateHabitForm() {
     const type = document.getElementById('habit-type').value;
     document.getElementById('habit-target-row').style.display = type !== 'completion' ? '' : 'none';
-    document.getElementById('habit-target-label').textContent = type === 'pomodoro' ? 'Focus (minutes)' : 'Daily target (minutes)';
+    document.getElementById('habit-target-label').textContent = type === 'pomodoro' ? 'Focus (minutes)' : 'Minutes per session';
+    document.getElementById('habit-count-label').textContent = type === 'duration' ? 'Target sessions per period' : 'Target times per period';
     document.getElementById('habit-reading-row').style.display = type === 'duration' ? '' : 'none';
-    document.getElementById('habit-period-row').style.display = type === 'completion' ? '' : 'none';
-    document.getElementById('habit-count-row').style.display = type === 'completion' ? '' : 'none';
+    document.getElementById('habit-period-row').style.display = type !== 'pomodoro' ? '' : 'none';
+    document.getElementById('habit-count-row').style.display = type !== 'pomodoro' ? '' : 'none';
     ['habit-short-break-row', 'habit-long-break-row', 'habit-sessions-row'].forEach(function(id) {
       document.getElementById(id).style.display = type === 'pomodoro' ? '' : 'none';
     });
@@ -951,6 +957,9 @@
   async function saveHabitWeekStart(value) {
     await postHabitSheep({action: 'setWeekStart', weekStart: Number(value)});
   }
+  async function saveHabitOrientation(value) {
+    await postHabitSheep({action: 'setOrientation', orientation: Number(value)});
+  }
   function saveSheepName() {
     postHabitSheep({action: 'setSheepName', name: document.getElementById('sheep-name').value});
   }
@@ -971,7 +980,7 @@
     const period = document.getElementById('habit-period').value;
     const targetCount = Number(document.getElementById('habit-count').value);
     if (!name || (type !== 'completion' && (!Number.isInteger(targetMinutes) || targetMinutes < 1 || targetMinutes > 1440)) ||
-      (type === 'completion' && (!Number.isInteger(targetCount) || targetCount < 1 || targetCount > 99)) ||
+      (type !== 'pomodoro' && (!Number.isInteger(targetCount) || targetCount < 1 || targetCount > 99)) ||
       (type === 'pomodoro' && (!Number.isInteger(shortBreakMinutes) || shortBreakMinutes < 1 || shortBreakMinutes > 120 ||
       !Number.isInteger(longBreakMinutes) || longBreakMinutes < 1 || longBreakMinutes > 120 ||
       !Number.isInteger(sessionsPerCycle) || sessionsPerCycle < 1 || sessionsPerCycle > 12))) {

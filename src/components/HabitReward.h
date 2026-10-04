@@ -20,6 +20,7 @@ inline bool showHabitReward(OptionPopup& popup, const std::string* habitId = nul
   else
     snprintf(message, sizeof(message), tr(STR_HABIT_REWARD_FULL), static_cast<unsigned>(SheepStateStore::GRASS_CAP),
              static_cast<unsigned>(SheepStateStore::GRASS_CAP));
-  popup.showGrassReward(habit ? habit->name.c_str() : tr(STR_HABIT_REWARD_TITLE), message, notice.grass, notice.stock);
+  popup.showGrassReward(habit ? habit->name.c_str() : tr(STR_HABIT_REWARD_TITLE), message, notice.grass, notice.stock,
+                        habit && habit->type == HabitType::Pomodoro ? tr(STR_HABIT_FOCUS_COMPLETED) : nullptr);
   return true;
 }

@@ -3,6 +3,8 @@
 #include <HalClock.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <ctime>
 
 #include "HabitEventLog.h"
@@ -33,6 +35,35 @@ const HabitTimer::Session* HabitTimer::find(const std::string& id) const {
 }
 
 void HabitTimer::clear(Session& session) { session = Session{}; }
+
+bool HabitTimer::rollDurationDay(Session& session) {
+  const auto* habit = HABIT_SHEEP.findHabit(session.habitId);
+  if (!habit || habit->type != HabitType::Duration) return true;
+  struct tm local{};
+  if (!halClock.isAvailable() || !halClock.localTime(local)) return true;
+  char today[16];
+  strftime(today, sizeof(today), "%Y-%m-%d", &local);
+  if (!*session.day) {
+    snprintf(session.day, sizeof(session.day), "%s", today);
+    return true;
+  }
+  if (strcmp(today, session.day) == 0) return true;
+  const uint32_t elapsed = elapsedMs(session);
+  const uint32_t newMs =
+      session.running
+          ? std::min<uint32_t>(elapsed,
+                               static_cast<uint32_t>(local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec) * 1000)
+          : 0;
+  const uint32_t oldSeconds = (elapsed - newMs) / 1000;
+  if (oldSeconds &&
+      !HABIT_EVENTS.appendDurationSecondsOnDay(session.habitId, oldSeconds, session.day, HabitEventSource::Timer))
+    return false;
+  session.accumulatedMs = newMs;
+  session.startedAtMs = millis();
+  snprintf(session.day, sizeof(session.day), "%s", today);
+  saveToFile();
+  return true;
+}
 
 bool HabitTimer::isActive() const {
   for (const auto& session : sessions) {
@@ -72,6 +103,14 @@ HabitTimer::Phase HabitTimer::phaseFor(const std::string& id) const {
   return session ? session->phase : Phase::Focus;
 }
 
+uint8_t HabitTimer::focusesUntilLongBreak(const std::string& id) const {
+  const auto* habit = HABIT_SHEEP.findHabit(id);
+  if (!habit || habit->type != HabitType::Pomodoro) return 0;
+  const auto* session = find(id);
+  if (session && session->phase == Phase::LongBreak) return 0;
+  return habit->sessionsPerCycle - (session ? session->focusesInCycle % habit->sessionsPerCycle : 0);
+}
+
 bool HabitTimer::start(const std::string& id) {
   if (!HABIT_SHEEP.isEnabled()) return false;
   if (id.empty() || find(id) || isRunning() || !HABIT_SHEEP.findHabit(id)) return false;
@@ -80,6 +119,8 @@ bool HabitTimer::start(const std::string& id) {
     session.habitId = id;
     session.startedAtMs = millis();
     session.running = true;
+    struct tm local{};
+    if (halClock.localTime(local)) strftime(session.day, sizeof(session.day), "%Y-%m-%d", &local);
     if (saveToFile()) return true;
     clear(session);
     return false;
@@ -90,6 +131,7 @@ bool HabitTimer::start(const std::string& id) {
 bool HabitTimer::pause(const std::string& id) {
   Session* session = find(id);
   if (!session || !session->running) return false;
+  if (!rollDurationDay(*session)) return false;
   session->accumulatedMs = elapsedMs(*session);
   session->running = false;
   return saveToFile();
@@ -99,6 +141,7 @@ bool HabitTimer::resume(const std::string& id) {
   if (!HABIT_SHEEP.isEnabled()) return false;
   Session* session = find(id);
   if (!session || session->running || isRunning()) return false;
+  if (!rollDurationDay(*session)) return false;
   session->startedAtMs = millis();
   session->running = true;
   if (saveToFile()) return true;
@@ -109,6 +152,7 @@ bool HabitTimer::resume(const std::string& id) {
 uint32_t HabitTimer::stopAndLog(const std::string& id) {
   Session* session = find(id);
   if (!session) return 0;
+  if (!rollDurationDay(*session)) return 0;
   const uint32_t seconds = elapsedMs(*session) / 1000;
   if (seconds > 0 && session->phase == Phase::Focus &&
       !HABIT_EVENTS.appendDurationSeconds(id, seconds, HabitEventSource::Timer))
@@ -149,14 +193,16 @@ void HabitTimer::tick() {
       saveToFile();
       return;
     }
+    if (!rollDurationDay(session)) return;
     if (!session.running) continue;
     if (habit->type != HabitType::Pomodoro) {
       const uint32_t seconds = elapsedMs(session) / 1000;
       if (millis() - session.lastTargetCheckMs < 1000) continue;
       session.lastTargetCheckMs = millis();
       const uint32_t target = static_cast<uint32_t>(habit->targetMinutes) * 60;
-      const uint32_t logged = HABIT_EVENTS.progressForToday(session.habitId).durationSeconds;
-      if (habit->type == HabitType::Duration && logged < target && seconds >= target - logged) {
+      const uint32_t logged = HABIT_EVENTS.durationSecondsForPeriod(*habit);
+      if (habit->type == HabitType::Duration && target &&
+          (static_cast<uint64_t>(logged) + seconds) / target > logged / target) {
         if (!HABIT_EVENTS.appendDurationSeconds(session.habitId, seconds, HabitEventSource::Timer)) return;
         session.accumulatedMs = elapsedMs(session) - seconds * 1000;
         session.startedAtMs = millis();
@@ -173,8 +219,8 @@ void HabitTimer::tick() {
 
     if (session.phase == Phase::Focus) {
       if (!HABIT_EVENTS.appendPomodoroFocus(session.habitId, targetSeconds)) return;
-      const auto progress = HABIT_EVENTS.progressForToday(session.habitId);
-      session.phase = progress.pomodoroSessions % habit->sessionsPerCycle == 0 ? Phase::LongBreak : Phase::ShortBreak;
+      session.focusesInCycle = (session.focusesInCycle + 1) % habit->sessionsPerCycle;
+      session.phase = session.focusesInCycle == 0 ? Phase::LongBreak : Phase::ShortBreak;
       session.accumulatedMs = 0;
       session.running = false;
       saveToFile();
@@ -190,7 +236,7 @@ void HabitTimer::tick() {
 }
 
 void HabitTimer::toJson(JsonDocument& doc) const {
-  doc["schema"] = 1;
+  doc["schema"] = 2;
   JsonArray values = doc["sessions"].to<JsonArray>();
   const int64_t now = currentEpoch();
   for (const auto& session : sessions) {
@@ -201,6 +247,8 @@ void HabitTimer::toJson(JsonDocument& doc) const {
     item["running"] = session.running;
     item["savedEpoch"] = now;
     item["phase"] = static_cast<uint8_t>(session.phase);
+    item["focusesInCycle"] = session.focusesInCycle;
+    item["day"] = session.day;
   }
 }
 
@@ -219,18 +267,18 @@ bool HabitTimer::fromJson(JsonVariantConst doc) {
     const int phase = item["phase"] | 0;
     session.phase = phase >= 0 && phase <= 2 ? static_cast<Phase>(phase) : Phase::Focus;
     const int64_t saved = item["savedEpoch"] | static_cast<int64_t>(0);
+    const auto* habit = HABIT_SHEEP.findHabit(id);
+    const uint8_t legacyCycle = habit->type == HabitType::Pomodoro
+                                    ? HABIT_EVENTS.progressForToday(id).pomodoroSessions % habit->sessionsPerCycle
+                                    : 0;
+    session.focusesInCycle = item["focusesInCycle"] | legacyCycle;
+    session.focusesInCycle = habit->type == HabitType::Pomodoro ? session.focusesInCycle % habit->sessionsPerCycle : 0;
+    snprintf(session.day, sizeof(session.day), "%s", item["day"] | "");
     if (saved > 0 && now > 0) {
       time_t savedTime = static_cast<time_t>(saved);
-      time_t currentTime = static_cast<time_t>(now);
       struct tm savedLocal{};
-      struct tm currentLocal{};
       localtime_r(&savedTime, &savedLocal);
-      localtime_r(&currentTime, &currentLocal);
-      if (savedLocal.tm_year != currentLocal.tm_year || savedLocal.tm_yday != currentLocal.tm_yday) {
-        clear(session);
-        --index;
-        continue;
-      }
+      if (!*session.day) strftime(session.day, sizeof(session.day), "%Y-%m-%d", &savedLocal);
     }
     // An interrupted activity or deep sleep never advances a habit timer.
     // The persisted elapsed value can be resumed explicitly by the user.
@@ -243,6 +291,7 @@ bool HabitTimer::pauseAll() {
   uint32_t previousMs = 0;
   for (auto& session : sessions) {
     if (!session.running) continue;
+    if (!rollDurationDay(session)) return false;
     running = &session;
     previousMs = session.accumulatedMs;
     session.accumulatedMs = elapsedMs(session);

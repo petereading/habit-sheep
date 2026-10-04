@@ -1429,6 +1429,9 @@ void CrossPointWebServer::handlePostHabitSheep() {
   } else if (strcmp(action, "setSheepName") == 0) {
     const char* name = doc["name"] | "";
     if (strlen(name) <= HabitSheepStore::MAX_NAME_BYTES) valid = HABIT_SHEEP.setSheepName(name);
+  } else if (strcmp(action, "setOrientation") == 0) {
+    const int value = doc["orientation"] | -1;
+    if (value >= 0 && value <= 3) valid = HABIT_SHEEP.setOrientation(value);
   }
 
   server->send(valid ? 200 : 400, "text/plain", valid ? "Saved" : "Invalid habit setting or save failed");

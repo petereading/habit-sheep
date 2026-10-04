@@ -11,7 +11,7 @@
 #include "SheepStateStore.h"
 
 namespace {
-constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 6;
+constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 7;
 
 const char* habitTypeName(const HabitType type) {
   if (type == HabitType::Pomodoro) return "pomodoro";
@@ -50,6 +50,7 @@ void HabitSheepStore::toJson(JsonDocument& doc) const {
   doc["sheepName"] = sheepName;
   doc["enabled"] = enabled;
   doc["weekStart"] = weekStart;
+  doc["orientation"] = orientation;
   doc["pausedSleepScreen"] = pausedSleepScreen;
 
   JsonArray habitArray = doc["habits"].to<JsonArray>();
@@ -80,6 +81,8 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
   enabled = doc["enabled"] | true;
   weekStart = doc["weekStart"] | static_cast<uint8_t>(1);
   if (weekStart > 6) weekStart = 1;
+  orientation = doc["orientation"] | static_cast<uint8_t>(0);
+  if (orientation > 3) orientation = 0;
   pausedSleepScreen = doc["pausedSleepScreen"] | static_cast<uint8_t>(255);
 
   const char* storedSheepName = doc["sheepName"] | "";
@@ -148,6 +151,16 @@ const HabitDefinition* HabitSheepStore::findHabit(const std::string& id) const {
   const auto it =
       std::find_if(habits.begin(), habits.end(), [&](const HabitDefinition& habit) { return habit.id == id; });
   return it == habits.end() ? nullptr : &*it;
+}
+
+bool HabitSheepStore::setOrientation(const uint8_t value) {
+  if (value > 3) return false;
+  if (value == orientation) return true;
+  const uint8_t previous = orientation;
+  orientation = value;
+  if (saveToFile()) return true;
+  orientation = previous;
+  return false;
 }
 
 bool HabitSheepStore::setSheepName(const std::string& name) {

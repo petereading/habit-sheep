@@ -29,6 +29,7 @@ class HabitEventLog {
   bool refreshToday();
   HabitDailyProgress progressForToday(const std::string& habitId);
   uint16_t completionCountForWeek(const std::string& habitId);
+  uint32_t durationSecondsForPeriod(const HabitDefinition& habit, const char* day = nullptr);
   bool appendCompletion(const std::string& habitId, HabitEventSource source = HabitEventSource::Manual);
   bool appendDurationSeconds(const std::string& habitId, uint32_t seconds,
                              HabitEventSource source = HabitEventSource::Manual);
@@ -44,6 +45,9 @@ class HabitEventLog {
   struct CachedWeekCount {
     std::string habitId;
     uint16_t count = 0;
+    uint32_t seconds = 0;
+    bool durationValid = false;
+    bool countValid = true;
   };
 
   std::string cachedDay;
@@ -51,7 +55,7 @@ class HabitEventLog {
   std::vector<CachedProgress> cachedProgress;
   std::vector<CachedWeekCount> cachedWeekCounts;
   std::array<RewardNotice, HabitSheepStore::MAX_HABITS> pendingRewards{};
-  void awardGrass(const std::string& habitId, uint8_t amount, const char* day = nullptr);
+  void awardGrass(const std::string& habitId, uint8_t amount, const char* day = nullptr, bool notify = true);
 
   bool currentDay(std::string& day, int64_t& epoch) const;
   std::string pathForDay(const std::string& day) const;

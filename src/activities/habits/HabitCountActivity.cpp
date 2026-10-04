@@ -17,6 +17,7 @@
 HabitCountActivity::HabitCountActivity(GfxRenderer& r, MappedInputManager& input, std::string id)
     : Activity("HabitCount", r, input), habitId(std::move(id)) {}
 void HabitCountActivity::onEnter() {
+  habitUi::applyOrientation(renderer);
   Activity::onEnter();
   popup.setHabitStyle();
 }

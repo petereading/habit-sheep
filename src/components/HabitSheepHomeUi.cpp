@@ -137,23 +137,13 @@ int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
   return -1;
 }
 
-void HabitSheepHomeUi::drawGround(int center, int y, int width) const {
-  const int half = width / 2;
-  for (int i = -half; i < half; ++i) {
-    const int dy = half ? 4 * i * i / (half * half) : 0;
-    const int next = half ? 4 * (i + 1) * (i + 1) / (half * half) : 0;
-    renderer.drawLine(center + i, y - dy, center + i + 1, y - next, true);
-  }
-}
-
 void HabitSheepHomeUi::drawSheep(int x, int y, int width, int height, bool showSelection) const {
-  if (showSelection && selection == 0) habitUi::frame(renderer, x, y, width, height);
+  if (showSelection && selection == 0) habitUi::frame(renderer, x + 8, y + 8, width - 16, height - 20);
   tm local{};
   halClock.localTime(local);
   if (SHEEP_STATE.isForaging()) {
     const int sw = std::min(340, width - 40), sx = x + (width - sw) / 2, sy = y + height / 3;
     renderer.drawLine(x + width / 2, sy + 90, x + width / 2, y + height - 20, 4, true);
-    drawGround(x + width / 2, y + height - 20, std::min(140, width / 2));
     renderer.fillRoundedRect(sx, sy, sw, 90, 10, Color::White);
     habitUi::frame(renderer, sx, sy, sw, 90, false);
     renderer.drawText(NOTOSANS_14_FONT_ID, sx + 12, sy + 10, tr(STR_SHEEP_FORAGING));
@@ -162,11 +152,10 @@ void HabitSheepHomeUi::drawSheep(int x, int y, int width, int height, bool showS
   } else {
     uint8_t pose = sheepScene::pose(local, !showSelection, SHEEP_STATE.isResting(), SHEEP_STATE.ateCurrentMeal(local));
     if (showSelection && sheepNudge) pose = sheepNudge == 1 ? 2 : 3;
-    const int maxW = std::min(width - 36, 420), maxH = std::min(height - 32, maxW * 3 / 4);
+    const int maxW = std::min(width - 64, 360), maxH = std::min(height - 56, maxW * 3 / 4);
     const int bondOffset = showSelection && SHEEP_STATE.getBondPoints() >= 5 ? std::min(16, (width - maxW) / 2) : 0;
     const int artW = std::min(maxW, maxH * 4 / 3), artH = artW * 3 / 4;
     const int artX = x + (width - artW) / 2 + bondOffset, artY = y + (height - artH) / 2;
-    drawGround(artX + artW / 2, artY + artH * (pose >= 12 && pose < 16 ? 170 : 180) / 192, std::min(180, artW / 2));
     habitUi::sheep(renderer, artX, artY, artW, artH, pose);
   }
 }
@@ -275,6 +264,7 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
   header(renderer, true);
   const int w = renderer.getScreenWidth(), h = renderer.getScreenHeight();
   habitUi::hearts(renderer, PAD, 55, 22, SHEEP_STATE.getMood());
+  habitUi::grassStock(renderer, w - PAD - 6, 55, std::min(26, (w / 2 - PAD - 36) / 7), SHEEP_STATE.getGrassStock());
   const int band = 142;
   drawSheep(PAD, 95, w - PAD * 2, h - band - 115, false);
   renderer.drawLine(PAD, h - band - 6, w - PAD, h - band - 6, true);

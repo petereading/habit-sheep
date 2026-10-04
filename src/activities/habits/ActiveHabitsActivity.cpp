@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "HabitSheepStore.h"
+#include "components/HabitUi.h"
 #include "components/UITheme.h"
 
 namespace fui = freeink::ui;
@@ -19,6 +20,7 @@ ActiveHabitsActivity::ActiveHabitsActivity(GfxRenderer& renderer, MappedInputMan
 }
 
 void ActiveHabitsActivity::onEnter() {
+  habitUi::applyOrientation(renderer);
   picker.setHabitStyle();
   UiListActivity::onEnter();
   refreshRows();

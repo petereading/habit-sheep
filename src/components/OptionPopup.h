@@ -343,9 +343,10 @@ class OptionPopup {
 
   bool isActive() const { return active; }
 
-  void showGrassReward(const char* habitName, const char* message, const uint16_t grass, const uint8_t stock) {
+  void showGrassReward(const char* habitName, const char* message, const uint16_t grass, const uint8_t stock,
+                       const char* title = nullptr) {
     const char* options[] = {tr(STR_DONE)};
-    show(tr(STR_HABIT_REWARD_TITLE), habitName, options, 1, 0, [](int) {});
+    show(title ? title : tr(STR_HABIT_REWARD_TITLE), habitName, options, 1, 0, [](int) {});
     snprintf(rewardText, sizeof(rewardText), "%s", message);
     grassBadge = true;
     grassGain = grass;

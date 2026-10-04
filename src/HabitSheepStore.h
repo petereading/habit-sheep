@@ -40,6 +40,7 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   bool enabled = true;
   uint32_t modeRevision = 0;
   uint8_t weekStart = 1;
+  uint8_t orientation = 0;
   uint8_t pausedSleepScreen = 255;
 
   HabitSheepStore();
@@ -65,6 +66,8 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   bool clearPausedSleepScreen();
   bool isEnabled() const { return enabled; }
   uint8_t getWeekStart() const { return weekStart; }
+  uint8_t getOrientation() const { return orientation; }
+  bool setOrientation(uint8_t value);
   uint8_t getPausedSleepScreen() const { return pausedSleepScreen; }
   bool setEnabled(bool value, uint8_t sleepScreen = 255);
   bool setWeekStart(uint8_t value);

@@ -114,7 +114,7 @@ void ReaderActivity::onExit() {
 
   LOG_INF("MEM", "reader exit: free=%u max_block=%u", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+  ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation());
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
 

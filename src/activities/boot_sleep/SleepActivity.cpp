@@ -621,6 +621,7 @@ void SleepActivity::renderCustomSleepScreen() const {
 // sequence, used once for the sleep image. It never runs the multi-flash GC
 // waveform (0xF7) that FULL_REFRESH selects (#2471's blinking complaint).
 void SleepActivity::renderHabitSheepSleepScreen() const {
+  ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation());
   HabitSheepHomeUi sleepUi(renderer);
   sleepUi.renderSleepUi(HABIT_SHEEP);
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);

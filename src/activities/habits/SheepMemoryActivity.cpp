@@ -10,6 +10,7 @@
 #include "fontIds.h"
 
 void SheepMemoryActivity::onEnter() {
+  habitUi::applyOrientation(renderer);
   Activity::onEnter();
   game.reset(esp_random() | 1U);
 }

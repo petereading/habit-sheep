@@ -30,6 +30,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
   bool hasOtherRunning(const std::string& id) const;
   uint32_t elapsedSecondsFor(const std::string& id) const;
   Phase phaseFor(const std::string& id) const;
+  uint8_t focusesUntilLongBreak(const std::string& id) const;
 
  private:
   struct Session {
@@ -38,7 +39,9 @@ class HabitTimer : public PersistableStore<HabitTimer> {
     unsigned long startedAtMs = 0;
     unsigned long lastTargetCheckMs = 0;
     Phase phase = Phase::Focus;
+    uint8_t focusesInCycle = 0;
     bool running = false;
+    char day[16]{};
   };
 
   // A paused timer follows its library habit even if the user swaps active Home slots.
@@ -48,6 +51,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
   const Session* find(const std::string& id) const;
   static int64_t currentEpoch();
   static uint32_t elapsedMs(const Session& session);
+  bool rollDurationDay(Session& session);
   void clear(Session& session);
 };
 

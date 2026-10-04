@@ -129,6 +129,7 @@ void SettingsActivity::rebuildSettingsLists() {
   habitSheepSettings.reserve(7);
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_MODE, SettingAction::HabitMode));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_WEEK_START, SettingAction::HabitWeekStart));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_ORIENTATION, SettingAction::HabitOrientation));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
@@ -388,6 +389,16 @@ void SettingsActivity::toggleCurrentSetting() {
         requestUpdate();
         break;
       }
+      case SettingAction::HabitOrientation: {
+        const StrId options[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
+                                 StrId::STR_LANDSCAPE_CCW};
+        optionPopup.show(StrId::STR_HABIT_ORIENTATION, options, 4, HABIT_SHEEP.getOrientation(), [this](int selected) {
+          if (!HABIT_SHEEP.setOrientation(selected)) LOG_ERR("HABIT", "Cannot save orientation");
+          requestUpdate();
+        });
+        requestUpdate();
+        break;
+      }
       case SettingAction::SheepMemory: {
         auto activity = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
         if (!activity) {
@@ -593,6 +604,11 @@ void SettingsActivity::openSleepTimeoutPicker() {
 
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
   if (setting.action == SettingAction::HabitMode) return HABIT_SHEEP.isEnabled() ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  if (setting.action == SettingAction::HabitOrientation) {
+    static constexpr StrId options[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
+                                        StrId::STR_LANDSCAPE_CCW};
+    return I18N.get(options[HABIT_SHEEP.getOrientation()]);
+  }
   if (setting.action == SettingAction::HabitWeekStart) {
     static constexpr StrId days[] = {StrId::STR_HABIT_SUNDAY,    StrId::STR_HABIT_MONDAY,   StrId::STR_HABIT_TUESDAY,
                                      StrId::STR_HABIT_WEDNESDAY, StrId::STR_HABIT_THURSDAY, StrId::STR_HABIT_FRIDAY,

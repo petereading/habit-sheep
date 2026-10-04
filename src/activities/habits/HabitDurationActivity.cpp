@@ -55,7 +55,7 @@ TimerLayout pomodoroLayout(const GfxRenderer& renderer, int count = 6) {
 TimerLayout durationLayout(const GfxRenderer& renderer, int count = 6) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int digitsY = metrics.topPadding + metrics.headerHeight + (renderer.getScreenHeight() <= 600 ? 44 : 100);
-  const int barY = digitsY + (renderer.getScreenHeight() <= 600 ? 84 : 130);
+  const int barY = digitsY + (renderer.getScreenHeight() <= 600 ? 106 : 154);
   const bool compact = renderer.getScreenHeight() <= 600;
   const int rowH = compact ? 34 : 48;
   return {0, digitsY, 0, barY, renderer.getScreenHeight() - metrics.buttonHintsHeight - 18 - count * rowH, rowH};
@@ -68,6 +68,7 @@ HabitDurationActivity::HabitDurationActivity(GfxRenderer& renderer, MappedInputM
     : Activity("HabitDuration", renderer, mappedInput), habitId(std::move(habitIdValue)) {}
 
 void HabitDurationActivity::onEnter() {
+  habitUi::applyOrientation(renderer);
   addMinutesPopup.setHabitStyle();
   Activity::onEnter();
   selection = 0;
@@ -334,7 +335,9 @@ void HabitDurationActivity::render(RenderLock&&) {
   auto progress = HABIT_EVENTS.progressForToday(habitId);
   if (HABIT_TIMER.isForHabit(habitId) && HABIT_TIMER.phaseFor(habitId) == HabitTimer::Phase::Focus)
     progress.durationSeconds += HABIT_TIMER.elapsedSecondsFor(habitId);
-  const uint32_t minutes = progress.durationSeconds / 60;
+  uint64_t periodSeconds = HABIT_EVENTS.durationSecondsForPeriod(*habit);
+  if (HABIT_TIMER.isForHabit(habitId) && habit->type == HabitType::Duration)
+    periodSeconds += HABIT_TIMER.elapsedSecondsFor(habitId);
 
   char progressText[40];
   const bool pomodoro = habit->type == HabitType::Pomodoro;
@@ -344,13 +347,14 @@ void HabitDurationActivity::render(RenderLock&&) {
   habitUi::icon(renderer, habitUi::iconFor(*habit), renderer.getScreenHeight() <= 600 ? SIDE_PAD : screenW / 2 - 24,
                 headerBottom + 6, 48);
   if (pomodoro) {
-    snprintf(progressText, sizeof(progressText), tr(STR_HABIT_FOCUS_PROGRESS),
-             static_cast<unsigned>(progress.pomodoroSessions), static_cast<unsigned>(habit->sessionsPerCycle));
+    snprintf(progressText, sizeof(progressText), tr(STR_HABIT_FOCUS_CYCLE),
+             static_cast<unsigned>(HABIT_TIMER.focusesUntilLongBreak(habitId)),
+             static_cast<unsigned>(progress.pomodoroSessions));
     const auto phase = HABIT_TIMER.phaseFor(habitId);
     const char* phaseLabel = phase == HabitTimer::Phase::Focus        ? tr(STR_HABIT_FOCUS)
                              : phase == HabitTimer::Phase::ShortBreak ? tr(STR_HABIT_SHORT_BREAK)
                                                                       : tr(STR_HABIT_LONG_BREAK);
-    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, layout.phaseY, phaseLabel);
+    renderer.drawCenteredText(SMALL_FONT_ID, layout.phaseY, phaseLabel);
     const uint32_t elapsed = HABIT_TIMER.elapsedSecondsFor(habitId);
     const uint32_t target = static_cast<uint32_t>(phase == HabitTimer::Phase::Focus        ? habit->targetMinutes
                                                   : phase == HabitTimer::Phase::ShortBreak ? habit->shortBreakMinutes
@@ -362,20 +366,25 @@ void HabitDurationActivity::render(RenderLock&&) {
     char unit[24];
     snprintf(unit, sizeof(unit), "/ %u %s", static_cast<unsigned>(target / 60), tr(STR_HABIT_MINUTES_ABBR));
     habitUi::number(renderer, screenW / 2, layout.digitsY, shown, unit, renderer.getScreenHeight() <= 600 ? 58 : 100);
-    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, layout.progressY, progressText);
+    renderer.drawCenteredText(SMALL_FONT_ID, layout.progressY, progressText);
+    habitUi::progress(renderer, SIDE_PAD, layout.barY, screenW - SIDE_PAD * 2, elapsed, target);
   } else {
-    snprintf(progressText, sizeof(progressText), "/ %u %s", static_cast<unsigned>(habit->targetMinutes),
-             tr(STR_HABIT_MINUTES_ABBR));
-    habitUi::number(renderer, screenW / 2, layout.digitsY, minutes, progressText,
+    const uint32_t sessions = static_cast<uint32_t>(periodSeconds / (habit->targetMinutes * 60UL));
+    renderer.drawCenteredText(SMALL_FONT_ID, headerBottom + (renderer.getScreenHeight() <= 600 ? 18 : 64),
+                              habit->period == HabitPeriod::Weekly ? tr(STR_HABIT_THIS_WEEK) : tr(STR_HABIT_TODAY));
+    snprintf(progressText, sizeof(progressText), "/ %u %s", static_cast<unsigned>(habit->targetCount),
+             tr(STR_HABIT_SESSIONS));
+    habitUi::number(renderer, screenW / 2, layout.digitsY, sessions, progressText,
                     renderer.getScreenHeight() <= 600 ? 58 : 100);
+    char timeText[80];
+    snprintf(timeText, sizeof(timeText), tr(STR_HABIT_SESSION_TIME), static_cast<unsigned long>(periodSeconds / 60),
+             static_cast<unsigned>(habit->targetMinutes));
+    renderer.drawCenteredText(SMALL_FONT_ID, layout.digitsY + (renderer.getScreenHeight() <= 600 ? 68 : 112), timeText);
+    habitUi::progress(renderer, SIDE_PAD, layout.barY, screenW - SIDE_PAD * 2, sessions, habit->targetCount);
   }
 
   const int barX = SIDE_PAD;
   const int barW = screenW - SIDE_PAD * 2;
-  const uint32_t targetSeconds =
-      static_cast<uint32_t>(habit->type == HabitType::Pomodoro ? habit->sessionsPerCycle : habit->targetMinutes * 60UL);
-  const uint32_t achieved = habit->type == HabitType::Pomodoro ? progress.pomodoroSessions : progress.durationSeconds;
-  habitUi::progress(renderer, barX, layout.barY, barW, achieved, targetSeconds);
   const int sheepTop = layout.barY + 22, sheepH = layout.actionsY - sheepTop - 8;
   if (sheepH > 55)
     habitUi::sheep(renderer, screenW / 2 - 85, sheepTop, 170, sheepH, HABIT_TIMER.isRunningFor(habitId) ? 0 : 12);

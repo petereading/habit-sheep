@@ -219,7 +219,7 @@ uint16_t HabitEventLog::completionCountForWeek(const std::string& habitId) {
   }
   const auto cached = std::find_if(cachedWeekCounts.begin(), cachedWeekCounts.end(),
                                    [&](const CachedWeekCount& item) { return item.habitId == habitId; });
-  if (cached != cachedWeekCounts.end()) return cached->count;
+  if (cached != cachedWeekCounts.end() && cached->countValid) return cached->count;
 
   struct tm local{};
   if (!halClock.localTime(local)) return progressForToday(habitId).completionCount;
@@ -233,8 +233,64 @@ uint16_t HabitEventLog::completionCountForWeek(const std::string& habitId) {
     strftime(previousDay, sizeof(previousDay), "%Y-%m-%d", &previous);
     count += completionCountForDay(habitId, previousDay);
   }
-  cachedWeekCounts.push_back({habitId, count});
+  if (cached != cachedWeekCounts.end()) {
+    cached->count = count;
+    cached->countValid = true;
+  } else {
+    cachedWeekCounts.push_back({habitId, count});
+  }
   return count;
+}
+
+uint32_t HabitEventLog::durationSecondsForPeriod(const HabitDefinition& habit, const char* day) {
+  std::string today;
+  int64_t epoch = 0;
+  currentDay(today, epoch);
+  if (today != cachedDay) refreshToday();
+  const bool current = !day || today == day;
+  if (habit.period != HabitPeriod::Weekly || today == "undated")
+    return current ? progressForToday(habit.id).durationSeconds : durationSecondsForDay(habit.id, day);
+  if (cachedWeekStart != HABIT_SHEEP.getWeekStart()) {
+    cachedWeekCounts.clear();
+    cachedWeekStart = HABIT_SHEEP.getWeekStart();
+  }
+  auto cached = std::find_if(cachedWeekCounts.begin(), cachedWeekCounts.end(),
+                             [&](const CachedWeekCount& item) { return item.habitId == habit.id; });
+  if (current && cached != cachedWeekCounts.end() && cached->durationValid) return cached->seconds;
+  struct tm local{};
+  if (day) {
+    int year = 0, month = 0, date = 0;
+    if (sscanf(day, "%d-%d-%d", &year, &month, &date) != 3) return durationSecondsForDay(habit.id, day);
+    local.tm_year = year - 1900;
+    local.tm_mon = month - 1;
+    local.tm_mday = date;
+    local.tm_isdst = -1;
+    mktime(&local);
+  } else if (!halClock.localTime(local)) {
+    return progressForToday(habit.id).durationSeconds;
+  }
+  local.tm_mday -= (local.tm_wday + 7 - HABIT_SHEEP.getWeekStart()) % 7;
+  mktime(&local);
+  uint32_t seconds = 0;
+  for (int offset = 0; offset < 7; ++offset) {
+    struct tm date = local;
+    date.tm_mday += offset;
+    mktime(&date);
+    char dateText[16];
+    strftime(dateText, sizeof(dateText), "%Y-%m-%d", &date);
+    const uint32_t amount =
+        today == dateText ? progressForToday(habit.id).durationSeconds : durationSecondsForDay(habit.id, dateText);
+    seconds = amount > UINT32_MAX - seconds ? UINT32_MAX : seconds + amount;
+  }
+  if (current) {
+    if (cached == cachedWeekCounts.end()) {
+      cachedWeekCounts.push_back({habit.id, 0, seconds, true, false});
+    } else {
+      cached->seconds = seconds;
+      cached->durationValid = true;
+    }
+  }
+  return seconds;
 }
 
 bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, const uint32_t amount, const char* unit,
@@ -290,7 +346,10 @@ bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, co
       }
     }
   } else if (strcmp(type, "duration") == 0) {
-    if (progress) progress->durationSeconds += amount;
+    if (progress)
+      progress->durationSeconds =
+          amount > UINT32_MAX - progress->durationSeconds ? UINT32_MAX : progress->durationSeconds + amount;
+    for (auto& cached : cachedWeekCounts) cached.durationValid = false;
   } else if (strcmp(type, "pomodoro") == 0) {
     if (progress) {
       progress->durationSeconds += amount;
@@ -303,16 +362,8 @@ bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, co
 bool HabitEventLog::appendCompletion(const std::string& habitId, const HabitEventSource source) {
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   if (!habit || habit->type != HabitType::Completion) return false;
-  const uint16_t count = habit->period == HabitPeriod::Weekly ? completionCountForWeek(habitId)
-                                                              : progressForToday(habitId).completionCount;
-  if (count >= habit->targetCount) return false;
   if (!appendEvent(habitId, "completion", 1, "completion", source)) return false;
-  // A weekly habit supplies a week's food, apportioned across its target.
-  // Each newly appended completion earns once; changing the week boundary never rewards old events.
-  const uint8_t reward = habit->period == HabitPeriod::Weekly && habit->targetCount < 7
-                             ? static_cast<uint8_t>(21 / habit->targetCount + (count < 21 % habit->targetCount ? 1 : 0))
-                             : 3;
-  awardGrass(habitId, reward);
+  awardGrass(habitId, 1);
   return true;
 }
 
@@ -320,11 +371,13 @@ bool HabitEventLog::appendDurationSeconds(const std::string& habitId, const uint
                                           const HabitEventSource source) {
   if (seconds == 0) return false;
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
-  const uint32_t before = progressForToday(habitId).durationSeconds;
+  const uint32_t before = habit ? durationSecondsForPeriod(*habit) : progressForToday(habitId).durationSeconds;
   if (!appendEvent(habitId, "duration", seconds, "seconds", source)) return false;
-  if (habit && habit->type == HabitType::Duration && before < static_cast<uint32_t>(habit->targetMinutes) * 60 &&
-      seconds >= static_cast<uint32_t>(habit->targetMinutes) * 60 - before)
-    awardGrass(habitId, 3);
+  if (habit && habit->type == HabitType::Duration && habit->targetMinutes) {
+    const uint32_t session = static_cast<uint32_t>(habit->targetMinutes) * 60;
+    const uint64_t earned = (static_cast<uint64_t>(before) + seconds) / session - before / session;
+    if (earned) awardGrass(habitId, static_cast<uint8_t>(std::min<uint64_t>(21, earned)), nullptr, false);
+  }
   return true;
 }
 
@@ -335,24 +388,30 @@ bool HabitEventLog::appendDurationSecondsOnDay(const std::string& habitId, const
   std::string today;
   int64_t ignoredEpoch = 0;
   currentDay(today, ignoredEpoch);
-  const uint32_t before =
-      day == today ? progressForToday(habitId).durationSeconds : durationSecondsForDay(habitId, day);
+  const uint32_t before = habit          ? durationSecondsForPeriod(*habit, day)
+                          : day == today ? progressForToday(habitId).durationSeconds
+                                         : durationSecondsForDay(habitId, day);
   if (!appendEvent(habitId, "duration", seconds, "seconds", source, day)) return false;
-  if (habit && habit->type == HabitType::Duration && before < static_cast<uint32_t>(habit->targetMinutes) * 60 &&
-      seconds >= static_cast<uint32_t>(habit->targetMinutes) * 60 - before)
-    awardGrass(habitId, 3, day);
+  if (habit && habit->type == HabitType::Duration && habit->targetMinutes) {
+    const uint32_t session = static_cast<uint32_t>(habit->targetMinutes) * 60;
+    const uint64_t earned = (static_cast<uint64_t>(before) + seconds) / session - before / session;
+    if (earned) awardGrass(habitId, static_cast<uint8_t>(std::min<uint64_t>(21, earned)), day, false);
+  }
   return true;
 }
 
 bool HabitEventLog::appendPomodoroFocus(const std::string& habitId, const uint32_t seconds) {
   if (seconds == 0) return false;
+  const auto* habit = HABIT_SHEEP.findHabit(habitId);
+  if (!habit || habit->type != HabitType::Pomodoro) return false;
   if (!appendEvent(habitId, "pomodoro", seconds, "seconds", HabitEventSource::Timer)) return false;
-  awardGrass(habitId, 3);
+  awardGrass(habitId, 1);
   return true;
 }
 
-void HabitEventLog::awardGrass(const std::string& habitId, const uint8_t amount, const char* day) {
+void HabitEventLog::awardGrass(const std::string& habitId, const uint8_t amount, const char* day, const bool notify) {
   const uint8_t earned = SHEEP_STATE.addGrass(amount, day);
+  if (!notify) return;
   RewardNotice* slot = nullptr;
   for (auto& reward : pendingRewards) {
     if (habitId == reward.habitId) {

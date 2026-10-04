@@ -9,6 +9,7 @@
 
 #include "HabitEventLog.h"
 #include "HabitTimer.h"
+#include "activities/reader/ReaderUtils.h"
 #include "fontIds.h"
 #include "icons/habitArt.generated.h"
 
@@ -57,6 +58,7 @@ void ink(const GfxRenderer& renderer, const ArtBitmap& bitmap, int x, int y, int
 }  // namespace
 
 namespace habitUi {
+void applyOrientation(GfxRenderer& renderer) { ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation()); }
 uint8_t iconFor(const HabitDefinition& habit) {
   return habit.icon < 24 ? habit.icon : habit.type == HabitType::Pomodoro ? 1 : habit.readingIntegration ? 0 : 15;
 }
@@ -125,11 +127,12 @@ void habitProgress(const HabitDefinition& habit, char* text, unsigned size) {
         habit.period == HabitPeriod::Weekly ? HABIT_EVENTS.completionCountForWeek(habit.id) : p.completionCount;
     snprintf(text, size, "%u / %u %s", count, habit.targetCount, tr(STR_HABIT_TIMES));
   } else if (habit.type == HabitType::Pomodoro) {
-    snprintf(text, size, "%u / %u %s", p.pomodoroSessions, habit.sessionsPerCycle, tr(STR_HABIT_SESSIONS));
+    snprintf(text, size, tr(STR_HABIT_FOCUS_TODAY), static_cast<unsigned>(p.pomodoroSessions));
   } else {
-    if (HABIT_TIMER.isForHabit(habit.id)) p.durationSeconds += HABIT_TIMER.elapsedSecondsFor(habit.id);
-    snprintf(text, size, "%lu / %u %s", static_cast<unsigned long>(p.durationSeconds / 60), habit.targetMinutes,
-             tr(STR_HABIT_MINUTES_ABBR));
+    uint64_t seconds = HABIT_EVENTS.durationSecondsForPeriod(habit);
+    if (HABIT_TIMER.isForHabit(habit.id)) seconds += HABIT_TIMER.elapsedSecondsFor(habit.id);
+    snprintf(text, size, "%lu / %u %s", static_cast<unsigned long>(seconds / (habit.targetMinutes * 60UL)),
+             habit.targetCount, tr(STR_HABIT_SESSIONS));
   }
 }
 }  // namespace habitUi

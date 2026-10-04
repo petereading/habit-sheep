@@ -14,6 +14,7 @@
 #include "fontIds.h"
 
 void GrassHistoryActivity::onEnter() {
+  habitUi::applyOrientation(renderer);
   Activity::onEnter();
   SHEEP_STATE.settleDay();
 }

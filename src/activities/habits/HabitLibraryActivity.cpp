@@ -10,6 +10,7 @@
 
 #include "HabitIconActivity.h"
 #include "I18n.h"
+#include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/HabitUi.h"
 #include "components/UITheme.h"
@@ -20,6 +21,7 @@ HabitLibraryActivity::HabitLibraryActivity(GfxRenderer& renderer, MappedInputMan
     : UiListActivity("HabitLibrary", renderer, mappedInput) {}
 
 void HabitLibraryActivity::onEnter() {
+  habitUi::applyOrientation(renderer);
   popup.setHabitStyle();
   UiListActivity::onEnter();
   rebuildRows();
@@ -49,8 +51,9 @@ void HabitLibraryActivity::rebuildRows() {
       subtitles.emplace_back(std::to_string(habit.targetMinutes) + "/" + std::to_string(habit.shortBreakMinutes) + "/" +
                              std::to_string(habit.longBreakMinutes) + " min");
     } else {
-      std::string text = std::to_string(habit.targetMinutes) + " min";
-      if (habit.readingIntegration) text += " · Reading";
+      std::string text = std::to_string(habit.targetCount) + " " + tr(STR_HABIT_SESSIONS) + " / " +
+                         (habit.period == HabitPeriod::Weekly ? tr(STR_HABIT_WEEKLY) : tr(STR_HABIT_DAILY)) + " · " +
+                         std::to_string(habit.targetMinutes) + " " + tr(STR_HABIT_MINUTES_ABBR);
       subtitles.push_back(std::move(text));
     }
   }
@@ -88,6 +91,8 @@ void HabitLibraryActivity::startAddHabit() {
 }
 
 void HabitLibraryActivity::chooseNewHabitType() {
+  pendingPeriod = HabitPeriod::Daily;
+  pendingTargetCount = 1;
   const char* OPTIONS[] = {"Completion", "Duration", tr(STR_HABIT_POMODORO)};
   popup.show("Habit type", OPTIONS, 3, 0, [this](const int index) {
     pendingType = index == 2 ? HabitType::Pomodoro : index == 1 ? HabitType::Duration : HabitType::Completion;
@@ -109,30 +114,43 @@ void HabitLibraryActivity::chooseCompletionPeriod() {
 }
 
 void HabitLibraryActivity::chooseCompletionTarget() {
-  const char* options[] = {"1", "2", "3", "5", "8", "10", "12"};
-  popup.show(tr(STR_HABIT_TARGET_COUNT), options, 7, 0, [this](const int selected) {
-    static constexpr uint8_t counts[] = {1, 2, 3, 5, 8, 10, 12};
-    if (selected < 0 || selected >= 7) return;
-    pendingTargetCount = counts[selected];
-    savePendingHabit(false);
+  auto picker = makeUniqueNoThrow<IntervalSelectionActivity>(
+      renderer, mappedInput, "HabitTarget",
+      pendingType == HabitType::Duration ? StrId::STR_HABIT_SESSION_TARGET : StrId::STR_HABIT_TARGET_COUNT, 1, 1, 99, 1,
+      5);
+  if (!picker) {
+    LOG_ERR("HABIT", "OOM: target picker");
+    return;
+  }
+  startActivityForResult(std::move(picker), [this](const ActivityResult& result) {
+    RenderLock lock;
+    if (result.isCancelled) return;
+    pendingTargetCount = std::get<IntervalResult>(result.data).value;
+    if (pendingType == HabitType::Duration)
+      chooseReadingIntegration();
+    else
+      savePendingHabit(false);
   });
-  requestUpdate();
 }
 
 void HabitLibraryActivity::chooseDurationTarget() {
-  static const char* OPTIONS[] = {"10 minutes", "15 minutes", "20 minutes", "25 minutes",
-                                  "30 minutes", "45 minutes", "60 minutes", "90 minutes"};
-  popup.show(pendingType == HabitType::Pomodoro ? tr(STR_HABIT_FOCUS_DURATION) : "Daily target", OPTIONS, 8,
-             pendingType == HabitType::Pomodoro ? 3 : 4, [this](const int index) {
-               static constexpr uint16_t TARGETS[] = {10, 15, 20, 25, 30, 45, 60, 90};
-               if (index < 0 || index >= 8) return;
-               pendingTargetMinutes = TARGETS[index];
-               if (pendingType == HabitType::Duration)
-                 chooseReadingIntegration();
-               else
-                 savePendingHabit(false);
-             });
-  requestUpdate();
+  auto picker = makeUniqueNoThrow<IntervalSelectionActivity>(
+      renderer, mappedInput, "HabitSessionLength",
+      pendingType == HabitType::Pomodoro ? StrId::STR_HABIT_FOCUS_DURATION : StrId::STR_HABIT_SESSION_LENGTH,
+      pendingType == HabitType::Pomodoro ? 25 : 30, 1, 1440, 1, 15, StrId::STR_HABIT_MINUTE_VALUE);
+  if (!picker) {
+    LOG_ERR("HABIT", "OOM: session picker");
+    return;
+  }
+  startActivityForResult(std::move(picker), [this](const ActivityResult& result) {
+    RenderLock lock;
+    if (result.isCancelled) return;
+    pendingTargetMinutes = std::get<IntervalResult>(result.data).value;
+    if (pendingType == HabitType::Duration)
+      chooseCompletionPeriod();
+    else
+      savePendingHabit(false);
+  });
 }
 
 void HabitLibraryActivity::chooseReadingIntegration() {
@@ -227,28 +245,27 @@ void HabitLibraryActivity::changeTarget(const std::string& habitId) {
   const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
   if (!found || found->type == HabitType::Completion) return;
   HabitDefinition original = *found;
-  static const char* OPTIONS[] = {"10 minutes", "15 minutes", "20 minutes", "25 minutes",
-                                  "30 minutes", "45 minutes", "60 minutes", "90 minutes"};
-  static constexpr uint16_t TARGETS[] = {10, 15, 20, 25, 30, 45, 60, 90};
-  int current = original.type == HabitType::Pomodoro ? 3 : 4;
-  for (int i = 0; i < 8; ++i) {
-    if (TARGETS[i] == original.targetMinutes) current = i;
+  auto picker = makeUniqueNoThrow<IntervalSelectionActivity>(
+      renderer, mappedInput, "HabitSessionLength",
+      original.type == HabitType::Pomodoro ? StrId::STR_HABIT_FOCUS_DURATION : StrId::STR_HABIT_SESSION_LENGTH,
+      original.targetMinutes, 1, 1440, 1, 15, StrId::STR_HABIT_MINUTE_VALUE);
+  if (!picker) {
+    LOG_ERR("HABIT", "OOM: session picker");
+    return;
   }
-  popup.show(original.type == HabitType::Pomodoro ? tr(STR_HABIT_FOCUS_DURATION) : "Daily target", OPTIONS, 8, current,
-             [this, original](const int index) mutable {
-               static constexpr uint16_t TARGETS[] = {10, 15, 20, 25, 30, 45, 60, 90};
-               if (index < 0 || index >= 8) return;
-               original.targetMinutes = TARGETS[index];
-               HABIT_SHEEP.upsertHabit(original);
-               rebuildRows();
-               requestUpdate();
-             });
-  requestUpdate();
+  startActivityForResult(std::move(picker), [this, original](const ActivityResult& result) mutable {
+    RenderLock lock;
+    if (result.isCancelled) return;
+    original.targetMinutes = std::get<IntervalResult>(result.data).value;
+    HABIT_SHEEP.upsertHabit(original);
+    rebuildRows();
+    requestUpdate();
+  });
 }
 
 void HabitLibraryActivity::changeCompletionPeriod(const std::string& habitId) {
   const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
-  if (!found || found->type != HabitType::Completion) return;
+  if (!found || found->type == HabitType::Pomodoro) return;
   HabitDefinition updated = *found;
   const char* options[] = {tr(STR_HABIT_DAILY), tr(STR_HABIT_WEEKLY)};
   popup.show(tr(STR_HABIT_PERIOD), options, 2, updated.period == HabitPeriod::Weekly ? 1 : 0,
@@ -263,22 +280,24 @@ void HabitLibraryActivity::changeCompletionPeriod(const std::string& habitId) {
 
 void HabitLibraryActivity::changeCompletionTarget(const std::string& habitId) {
   const HabitDefinition* found = HABIT_SHEEP.findHabit(habitId);
-  if (!found || found->type != HabitType::Completion) return;
+  if (!found || found->type == HabitType::Pomodoro) return;
   HabitDefinition updated = *found;
-  static constexpr uint8_t counts[] = {1, 2, 3, 5, 8, 10, 12};
-  const char* options[] = {"1", "2", "3", "5", "8", "10", "12"};
-  int current = 0;
-  for (int i = 0; i < 7; ++i) {
-    if (counts[i] == updated.targetCount) current = i;
+  auto picker = makeUniqueNoThrow<IntervalSelectionActivity>(
+      renderer, mappedInput, "HabitTarget",
+      updated.type == HabitType::Duration ? StrId::STR_HABIT_SESSION_TARGET : StrId::STR_HABIT_TARGET_COUNT,
+      updated.targetCount, 1, 99, 1, 5);
+  if (!picker) {
+    LOG_ERR("HABIT", "OOM: target picker");
+    return;
   }
-  popup.show(tr(STR_HABIT_TARGET_COUNT), options, 7, current, [this, updated](const int selected) mutable {
-    if (selected < 0 || selected >= 7) return;
-    updated.targetCount = counts[selected];
+  startActivityForResult(std::move(picker), [this, updated](const ActivityResult& result) mutable {
+    RenderLock lock;
+    if (result.isCancelled) return;
+    updated.targetCount = std::get<IntervalResult>(result.data).value;
     HABIT_SHEEP.upsertHabit(updated);
     rebuildRows();
     requestUpdate();
   });
-  requestUpdate();
 }
 
 void HabitLibraryActivity::changePomodoroBreak(const std::string& habitId, const bool longBreak) {
@@ -313,7 +332,7 @@ void HabitLibraryActivity::changePomodoroSessions(const std::string& habitId) {
   HabitDefinition updated = *found;
   static const char* OPTIONS[] = {"2 sessions", "3 sessions", "4 sessions", "5 sessions", "6 sessions"};
   const int current = updated.sessionsPerCycle >= 2 && updated.sessionsPerCycle <= 6 ? updated.sessionsPerCycle - 2 : 2;
-  popup.show(tr(STR_HABIT_FOCUS_SESSIONS), OPTIONS, 5, current, [this, updated](const int index) mutable {
+  popup.show(tr(STR_HABIT_FOCUS_CYCLE_LENGTH), OPTIONS, 5, current, [this, updated](const int index) mutable {
     if (index < 0 || index >= 5) return;
     updated.sessionsPerCycle = static_cast<uint8_t>(index + 2);
     HABIT_SHEEP.upsertHabit(updated);
@@ -352,7 +371,7 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
                              tr(STR_HABIT_FOCUS_DURATION),
                              tr(STR_HABIT_SHORT_BREAK),
                              tr(STR_HABIT_LONG_BREAK),
-                             tr(STR_HABIT_FOCUS_SESSIONS),
+                             tr(STR_HABIT_FOCUS_CYCLE_LENGTH),
                              "Delete",
                              tr(STR_HABIT_ICON)};
     popup.show(habit->name.c_str(), OPTIONS, 7, 0, [this, habitId](const int index) {
@@ -372,8 +391,9 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         changeIcon(habitId);
     });
   } else if (habit->type == HabitType::Duration) {
-    const char* OPTIONS[] = {"Rename", "Change target", tr(STR_HABIT_AUTO_READING), "Delete", tr(STR_HABIT_ICON)};
-    popup.show(habit->name.c_str(), OPTIONS, 5, 0, [this, habitId](const int index) {
+    const char* OPTIONS[] = {"Rename",           tr(STR_HABIT_SESSION_LENGTH), tr(STR_HABIT_AUTO_READING),  "Delete",
+                             tr(STR_HABIT_ICON), tr(STR_HABIT_PERIOD),         tr(STR_HABIT_SESSION_TARGET)};
+    popup.show(habit->name.c_str(), OPTIONS, 7, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -384,6 +404,10 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         confirmDelete(habitId);
       else if (index == 4)
         changeIcon(habitId);
+      else if (index == 5)
+        changeCompletionPeriod(habitId);
+      else if (index == 6)
+        changeCompletionTarget(habitId);
     });
   } else {
     const char* OPTIONS[] = {"Rename", tr(STR_HABIT_PERIOD), tr(STR_HABIT_TARGET_COUNT), "Delete", tr(STR_HABIT_ICON)};

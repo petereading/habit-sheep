@@ -47,7 +47,6 @@ class HabitSheepHomeUi {
   unsigned long nudgeStartedMs = 0;
 
   void drawSheep(int x, int y, int width, int height, bool showSelection = true) const;
-  void drawGround(int center, int y, int width) const;
   void drawHabitRows(const HabitSheepStore& store, int top, int height, bool passive = false) const;
   void drawDock(int top, int height) const;
 };
