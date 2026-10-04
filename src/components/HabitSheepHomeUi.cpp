@@ -196,15 +196,18 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, int top, int 
                           top + tile + 32, shown.c_str());
       }
     } else if (!passive) {
-      // Erase alternating edge sections while retaining the rounded corners.
-      renderer.drawRoundedRect(x, top + 2, tile, tile, 1, 12, true);
-      for (int offset = 12; offset < tile - 12; offset += 14) {
-        renderer.drawLine(x + offset, top + 2, x + std::min(offset + 7, tile - 12), top + 2, false);
-        renderer.drawLine(x + offset, top + tile + 2, x + std::min(offset + 7, tile - 12), top + tile + 2, false);
-        renderer.drawLine(x, top + offset + 2, x, top + std::min(offset + 7, tile - 12) + 2, false);
-        renderer.drawLine(x + tile, top + offset + 2, x + tile, top + std::min(offset + 7, tile - 12) + 2, false);
+      if (selection == i + 1) {
+        habitUi::frame(renderer, x, top + 2, tile, tile);
+      } else {
+        // Erase alternating edge sections while retaining the rounded corners.
+        renderer.drawRoundedRect(x, top + 2, tile, tile, 1, 12, true);
+        for (int offset = 12; offset < tile - 12; offset += 14) {
+          renderer.drawLine(x + offset, top + 2, x + std::min(offset + 7, tile - 12), top + 2, false);
+          renderer.drawLine(x + offset, top + tile + 2, x + std::min(offset + 7, tile - 12), top + tile + 2, false);
+          renderer.drawLine(x, top + offset + 2, x, top + std::min(offset + 7, tile - 12) + 2, false);
+          renderer.drawLine(x + tile, top + offset + 2, x + tile, top + std::min(offset + 7, tile - 12) + 2, false);
+        }
       }
-      if (selection == i + 1) habitUi::frame(renderer, x - 5, top - 3, tile + 10, tile + 10);
     }
   }
   if (!passive) {
