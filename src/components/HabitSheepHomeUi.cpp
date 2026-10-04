@@ -35,7 +35,8 @@ struct Layout {
   int habitTop, habitHeight, statusTop, sheepTop, sheepHeight;
 };
 Layout layout(const GfxRenderer& r) {
-  const int band = r.getScreenHeight() <= 600 ? 108 : 156;
+  const int iconBand = r.getScreenHeight() <= 600 ? 76 : 106;
+  const int band = iconBand + r.getLineHeight(NOTOSANS_14_FONT_ID) + 24;
   const int status = HEADER + band;
   return {HEADER, band, status, status + 48, r.getScreenHeight() - DOCK - status - 48};
 }
@@ -77,7 +78,14 @@ void header(const GfxRenderer& r, bool sleeping) {
     }
   }
   const auto& m = UITheme::getInstance().getMetrics();
-  GUI.drawBatteryLeft(r, Rect{r.getScreenWidth() - PAD - m.batteryWidth, 18, m.batteryWidth, m.batteryHeight},
+  int top = 0, right = 0, bottom = 0, left = 0;
+  r.getOrientedViewableTRBL(&top, &right, &bottom, &left);
+  char percentage[6];
+  snprintf(percentage, sizeof(percentage), "%u%%", powerManager.getBatteryPercentage());
+  const int textWidth = sleeping ? 0 : 4 + r.getTextWidth(SMALL_FONT_ID, percentage);
+  GUI.drawBatteryLeft(r,
+                      Rect{r.getScreenWidth() - std::max(PAD, right + 8) - m.batteryWidth - textWidth,
+                           std::max(18, top + 4), m.batteryWidth, m.batteryHeight},
                       !sleeping);
 }
 }  // namespace
@@ -129,18 +137,23 @@ int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
   return -1;
 }
 
-void HabitSheepHomeUi::drawPasture(int x, int y, int width, int height) const {
-  renderer.drawLine(x + 16, y + height - 20, x + width - 16, y + height - 20, 2, true);
+void HabitSheepHomeUi::drawGround(int center, int y, int width) const {
+  const int half = width / 2;
+  for (int i = -half; i < half; ++i) {
+    const int dy = half ? 4 * i * i / (half * half) : 0;
+    const int next = half ? 4 * (i + 1) * (i + 1) / (half * half) : 0;
+    renderer.drawLine(center + i, y - dy, center + i + 1, y - next, true);
+  }
 }
 
-void HabitSheepHomeUi::drawSheep(int x, int y, int width, int height, const char* name, bool showSelection) const {
-  drawPasture(x, y, width, height);
+void HabitSheepHomeUi::drawSheep(int x, int y, int width, int height, bool showSelection) const {
   if (showSelection && selection == 0) habitUi::frame(renderer, x, y, width, height);
   tm local{};
   halClock.localTime(local);
   if (SHEEP_STATE.isForaging()) {
     const int sw = std::min(340, width - 40), sx = x + (width - sw) / 2, sy = y + height / 3;
     renderer.drawLine(x + width / 2, sy + 90, x + width / 2, y + height - 20, 4, true);
+    drawGround(x + width / 2, y + height - 20, std::min(140, width / 2));
     renderer.fillRoundedRect(sx, sy, sw, 90, 10, Color::White);
     habitUi::frame(renderer, sx, sy, sw, 90, false);
     renderer.drawText(NOTOSANS_14_FONT_ID, sx + 12, sy + 10, tr(STR_SHEEP_FORAGING));
@@ -149,25 +162,27 @@ void HabitSheepHomeUi::drawSheep(int x, int y, int width, int height, const char
   } else {
     uint8_t pose = sheepScene::pose(local, !showSelection, SHEEP_STATE.isResting(), SHEEP_STATE.ateCurrentMeal(local));
     if (showSelection && sheepNudge) pose = sheepNudge == 1 ? 2 : 3;
-    const int maxW = std::min(width - 36, 380), maxH = std::min(height - 40, maxW * 3 / 4);
+    const int maxW = std::min(width - 36, 420), maxH = std::min(height - 32, maxW * 3 / 4);
     const int bondOffset = showSelection && SHEEP_STATE.getBondPoints() >= 5 ? std::min(16, (width - maxW) / 2) : 0;
-    habitUi::sheep(renderer, x + (width - maxW) / 2 + bondOffset, y + height - maxH - 24, maxW, maxH, pose);
-  }
-  if (name && *name) {
-    const auto label = renderer.truncatedText(SMALL_FONT_ID, name, width - 32);
-    renderer.drawText(SMALL_FONT_ID, x + 16, y + 8, label.c_str());
+    const int artW = std::min(maxW, maxH * 4 / 3), artH = artW * 3 / 4;
+    const int artX = x + (width - artW) / 2 + bondOffset, artY = y + (height - artH) / 2;
+    drawGround(artX + artW / 2, artY + artH * (pose >= 12 && pose < 16 ? 170 : 180) / 192, std::min(180, artW / 2));
+    habitUi::sheep(renderer, artX, artY, artW, artH, pose);
   }
 }
 
 void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, int top, int height, bool passive) const {
   const int step = (renderer.getScreenWidth() - PAD * 2) / 3;
-  const int tile = std::min(passive ? 72 : 90, height - 38);
+  const int captionHeight = renderer.getLineHeight(NOTOSANS_14_FONT_ID);
+  const int tile = std::min(passive ? 72 : 94, height - captionHeight - 24);
   for (int i = 0; i < 3; ++i) {
     const auto* habit = store.findHabit(store.getActiveHabitIds()[i]);
     const int x = PAD + i * step + (step - tile) / 2;
     if (habit) {
-      if (!passive) habitUi::frame(renderer, x, top + 2, tile, tile, selection == i + 1);
-      habitUi::icon(renderer, habitUi::iconFor(*habit), x + (tile - 48) / 2, top + 2 + (tile - 48) / 2, 48);
+      if (!passive && selection == i + 1) habitUi::frame(renderer, x, top + 2, tile, tile);
+      const int iconSize = passive ? 48 : tile - 12;
+      habitUi::icon(renderer, habitUi::iconFor(*habit), x + (tile - iconSize) / 2, top + 2 + (tile - iconSize) / 2,
+                    iconSize);
       if (passive) {
         const auto name = renderer.truncatedText(SMALL_FONT_ID, habit->name.c_str(), step - 12);
         renderer.drawText(SMALL_FONT_ID,
@@ -205,7 +220,7 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, int top, int 
     } else
       snprintf(label, sizeof(label), "%s", tr(STR_HABIT_CHOOSE));
     const auto shown = renderer.truncatedText(NOTOSANS_14_FONT_ID, label, renderer.getScreenWidth() - PAD * 2);
-    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top + height - 32, shown.c_str());
+    renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top + height - captionHeight - 12, shown.c_str());
   }
 }
 
@@ -244,12 +259,10 @@ void HabitSheepHomeUi::renderUi(const HabitSheepStore& store, bool showDock, con
     const auto l = layout(renderer);
     drawHabitRows(store, l.habitTop, l.habitHeight);
     habitUi::hearts(renderer, PAD, l.statusTop + 8, std::min(26, (w / 2 - 40) / 5), SHEEP_STATE.getMood());
-    if (selection == 10) habitUi::frame(renderer, w / 2, l.statusTop, w / 2 - PAD, 44);
-    habitUi::grass(renderer, w / 2 + 12, l.statusTop + 8, 28);
-    char stock[24];
-    snprintf(stock, sizeof(stock), "%u / %u", SHEEP_STATE.getGrassStock(), SheepStateStore::GRASS_CAP);
-    renderer.drawText(NOTOSANS_14_FONT_ID, w / 2 + 50, l.statusTop + 8, stock);
-    drawSheep(PAD, l.sheepTop, w - PAD * 2, l.sheepHeight, store.getSheepName().c_str());
+    if (selection == 10) habitUi::frame(renderer, w / 2, l.statusTop + 2, w / 2 - PAD, 44);
+    const int grassSize = std::min(26, (w / 2 - PAD - 36) / 7);
+    habitUi::grassStock(renderer, w - PAD - 6, l.statusTop + 8, grassSize, SHEEP_STATE.getGrassStock());
+    drawSheep(PAD, l.sheepTop, w - PAD * 2, l.sheepHeight);
   }
   if (showDock) drawDock(h - DOCK, DOCK);
 }
@@ -260,7 +273,7 @@ void HabitSheepHomeUi::renderSleepUi(const HabitSheepStore& store) const {
   const int w = renderer.getScreenWidth(), h = renderer.getScreenHeight();
   habitUi::hearts(renderer, PAD, 55, 22, SHEEP_STATE.getMood());
   const int band = 142;
-  drawSheep(PAD, 95, w - PAD * 2, h - band - 115, "", false);
+  drawSheep(PAD, 95, w - PAD * 2, h - band - 115, false);
   renderer.drawLine(PAD, h - band - 6, w - PAD, h - band - 6, true);
   drawHabitRows(store, h - band, band, true);
 }

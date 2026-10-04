@@ -50,20 +50,34 @@ for i in range(18):
     transform = 'translate(256 0) scale(-1 1)' if mirror else ''
     svg(f'sheep_{i:02}', f'<g transform="{transform}"><g transform="translate(0 {body_shift})">{front}'
         f'<g transform="rotate({tilt} 171 95)">{face}</g>'
-        f'<path d="{BODY}" fill="white" stroke="black" stroke-width="4" stroke-linejoin="round"/>'
+        f'<path d="{BODY}" fill="white" stroke="black" stroke-width="3" stroke-linejoin="round"/>'
         f'{marks}</g></g>')
 
 for variant in range(4):
     face_color = 'white' if variant & 1 else 'black'
     eye_color = 'black' if variant & 1 else 'white'
     leg_color = 'white' if variant & 2 else 'black'
-    legs = f'<path d="M71 139v27q8 12 17 0v-27M132 139v27q8 12 17 0v-27" fill="{leg_color}" stroke="black" stroke-width="4"/>'
-    face = f'<path d="M171 65C192 62 224 74 232 100C238 125 211 143 183 137C160 133 153 108 163 88Z" fill="{face_color}" stroke="black" stroke-width="4"/>'
+    legs = f'<path d="M71 139v27q8 12 17 0v-27M132 139v27q8 12 17 0v-27" fill="{leg_color}" stroke="black" stroke-width="3"/>'
+    face = f'<path d="M171 65C192 62 224 74 232 100C238 125 211 143 183 137C160 133 153 108 163 88Z" fill="{face_color}" stroke="black" stroke-width="3"/>'
     face += f'<circle cx="208" cy="103" r="4" fill="{eye_color}"/><path d="M212 122q5 5 9 0" stroke="{eye_color}" fill="none" stroke-width="3"/>'
-    svg(f'pair_{variant:02}', legs + face + f'<path d="{BODY}" fill="white" stroke="black" stroke-width="4"/>')
+    svg(f'pair_{variant:02}', legs + face + f'<path d="{BODY}" fill="white" stroke="black" stroke-width="3"/>')
 
 outline = 'fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"'
 svg('grass', f'<g {outline}><path d="M24 43V8M24 28 10 13M24 35l14-19M12 43 6 27m30 16 7-14"/></g>',48,48)
+# Three independent blades preserve exact one-unit stock changes at small sizes.
+stock_blades = (
+    'M22 43C12 38 7 25 4 16C15 20 22 31 22 43Z',
+    'M24 43C18 30 20 14 25 4C31 17 30 32 24 43Z',
+    'M26 43C25 31 34 20 43 15C40 30 35 40 26 43Z',
+)
+for stock in range(4):
+    blades = []
+    for index, path in enumerate(stock_blades):
+        fill = 'black' if index < stock else 'white'
+        blades.append(f'<path d="{path}" fill="{fill}" stroke="black" stroke-width="1.5" '
+                      'stroke-linejoin="round"/>')
+    svg(f'grass_stock_{stock}', ''.join(blades), 48, 48)
+
 svg('heart', '<path d="M24 42 6 24C-3 13 11 3 24 16 37 3 51 13 42 24L24 42Z" fill="black"/>',48,48)
 svg('heart_empty', f'<path d="M24 42 6 24C-3 13 11 3 24 16 37 3 51 13 42 24L24 42Z" {outline}/>',48,48)
 svg('pet', f'<g {outline}><path d="M9 38 5 23q0-4 3-3l6 9V10q0-5 4-1v14-17q0-5 4-1v18-16q0-5 4-1v18-12q0-5 4-1v20l7-9q4-2 4 2L31 41H13Z"/></g>',48,48)

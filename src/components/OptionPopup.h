@@ -32,9 +32,9 @@
 class OptionPopup {
  public:
   void setHabitStyle(bool value = true) { habitStyle = value; }
-  void showInteractions(std::function<void(int)> callback) {
+  void showInteractions(const char* sheepName, std::function<void(int)> callback) {
     const char* options[] = {tr(STR_SHEEP_PET), tr(STR_SHEEP_CALL), tr(STR_SHEEP_MEMORY)};
-    show(tr(STR_SHEEP_INTERACT), options, 3, 0, std::move(callback));
+    show(sheepName && *sheepName ? sheepName : tr(STR_SHEEP_INTERACT), options, 3, 0, std::move(callback));
     iconMenu = true;
   }
   void showMinuteChoices(std::function<void(int)> callback) {
@@ -172,8 +172,9 @@ class OptionPopup {
       const int h = std::min(minuteMenu ? 390 : 220, renderer.getScreenHeight() - 90);
       const int x = 24, y = (renderer.getScreenHeight() - h) / 2;
       renderer.fillRoundedRect(x, y, w, h, 12, Color::White);
-      habitUi::frame(renderer, x, y, w, h);
-      renderer.drawCenteredText(NOTOSANS_14_FONT_ID, y + 14, title.c_str());
+      habitUi::popupFrame(renderer, x, y, w, h);
+      const auto shownTitle = renderer.truncatedText(NOTOSANS_14_FONT_ID, title.c_str(), w - 32);
+      renderer.drawCenteredText(NOTOSANS_14_FONT_ID, y + 14, shownTitle.c_str());
       interactions.beginPublishCycle();
       auto target = makeUiTarget(renderer);
       const auto device = target.deviceContext();
@@ -183,9 +184,11 @@ class OptionPopup {
                                   static_cast<int16_t>(h)},
                 ACTION_CHROME, 0, freeink::ui::InputTouch);
       const int columns = minuteMenu ? 2 : 3, rows = minuteMenu ? 4 : 1, step = (w - 32) / columns;
-      const int tile = minuteMenu ? step - 10 : std::min(80, (w - 40) / 3), rowH = minuteMenu ? (h - 86) / 4 : 80;
+      const int menuTop = 14 + renderer.getLineHeight(NOTOSANS_14_FONT_ID) + 12;
+      const int tile = minuteMenu ? step - 10 : std::min(80, (w - 40) / 3);
+      const int rowH = minuteMenu ? (h - menuTop - 24) / 4 : 80;
       for (int i = 0; i < columns * rows; ++i) {
-        const int px = x + 16 + (i % columns) * step + (step - tile) / 2, py = y + 52 + (i / columns) * rowH;
+        const int px = x + 16 + (i % columns) * step + (step - tile) / 2, py = y + menuTop + (i / columns) * rowH;
         const int tileH = minuteMenu ? rowH - 8 : tile;
         habitUi::frame(renderer, px, py, tile, tileH, i == selectedIndex);
         if (minuteMenu)

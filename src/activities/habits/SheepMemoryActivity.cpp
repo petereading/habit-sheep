@@ -74,7 +74,7 @@ void SheepMemoryActivity::render(RenderLock&&) {
   if (game.complete()) {
     const int w = renderer.getScreenWidth() - 64, y = renderer.getScreenHeight() / 2 - 100;
     renderer.fillRoundedRect(32, y, w, 180, 12, Color::White);
-    habitUi::frame(renderer, 32, y, w, 180);
+    habitUi::popupFrame(renderer, 32, y, w, 180);
     habitUi::sheep(renderer, renderer.getScreenWidth() / 2 - 60, y + 16, 120, 90, 2);
     UITheme::drawCenteredWrappedText(renderer, Rect{48, y + 112, w - 32, 58}, SMALL_FONT_ID, tr(STR_SHEEP_MEMORY_DONE),
                                      2);

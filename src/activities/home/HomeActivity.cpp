@@ -373,7 +373,7 @@ void HomeActivity::activateHabitSheepSelection() {
         else
           onFileBrowserOpen();
       } else if (!SHEEP_STATE.isForaging()) {
-        habitReplacementPopup.showInteractions([this](int selected) {
+        habitReplacementPopup.showInteractions(HABIT_SHEEP.getSheepName().c_str(), [this](int selected) {
           if (selected == 0 || selected == 1) {
             SHEEP_STATE.recordInteraction();
             habitSheepUi->nudgeSheep(static_cast<uint8_t>(selected));

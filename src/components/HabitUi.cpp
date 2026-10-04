@@ -27,6 +27,8 @@ constexpr ArtBitmap SHEEP[] = {habitArt::sheep_00, habitArt::sheep_01, habitArt:
                                habitArt::sheep_12, habitArt::sheep_13, habitArt::sheep_14, habitArt::sheep_15,
                                habitArt::sheep_16, habitArt::sheep_17};
 constexpr ArtBitmap PAIRS[] = {habitArt::pair_00, habitArt::pair_01, habitArt::pair_02, habitArt::pair_03};
+constexpr ArtBitmap GRASS_STOCK[] = {habitArt::grass_stock_0, habitArt::grass_stock_1, habitArt::grass_stock_2,
+                                     habitArt::grass_stock_3};
 constexpr StrId NAMES[] = {
     StrId::STR_ICON_READING, StrId::STR_ICON_FOCUS,        StrId::STR_ICON_WRITING,  StrId::STR_ICON_STUDY,
     StrId::STR_ICON_WALKING, StrId::STR_ICON_RUNNING,      StrId::STR_ICON_STRENGTH, StrId::STR_ICON_WATER,
@@ -67,6 +69,14 @@ void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t po
   ink(r, variant < 4 ? PAIRS[variant] : SHEEP[pose % 18], x + (width - w) / 2, y + (height - h) / 2, w, h);
 }
 void grass(const GfxRenderer& r, int x, int y, int size) { ink(r, habitArt::grass, x, y, size, size); }
+void grassStock(const GfxRenderer& r, int right, int y, int size, uint8_t stock) {
+  constexpr int COUNT = 7, GAP = 4;
+  const int left = right - COUNT * size - (COUNT - 1) * GAP;
+  for (int i = 0; i < COUNT; ++i) {
+    const int blades = std::clamp(static_cast<int>(stock) - i * 3, 0, 3);
+    ink(r, GRASS_STOCK[blades], left + i * (size + GAP), y, size, size);
+  }
+}
 void hearts(const GfxRenderer& r, int x, int y, int size, uint8_t mood) {
   for (int i = 0; i < 5; ++i)
     ink(r, i < mood ? habitArt::heart : habitArt::heart_empty, x + i * (size + 6), y, size, size);
@@ -77,7 +87,10 @@ void interaction(const GfxRenderer& r, int action, int x, int y, int size) {
 }
 void frame(const GfxRenderer& r, int x, int y, int w, int h, bool focused) {
   r.drawRoundedRect(x, y, w, h, focused ? 2 : 1, 12, true);
-  if (focused) r.drawRoundedRect(x + 5, y + 5, w - 10, h - 10, 1, 8, true);
+}
+void popupFrame(const GfxRenderer& r, int x, int y, int w, int h) {
+  r.drawRoundedRect(x, y, w, h, 2, 12, true);
+  r.drawRoundedRect(x + 5, y + 5, w - 10, h - 10, 1, 8, true);
 }
 void number(const GfxRenderer& r, int center, int top, uint32_t value, const char* unit, int height) {
   static constexpr uint8_t DIGITS[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
