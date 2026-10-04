@@ -34,7 +34,7 @@ void HabitCountActivity::loop() {
     return;
   }
   if (!HABIT_SHEEP.isEnabled()) return;
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int h = safe.y + safe.height;
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
       mappedInput.wasTapInRect(safe.x + 24, h - 100, safe.width - 48, 62)) {
@@ -51,7 +51,7 @@ void HabitCountActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const auto* habit = HABIT_SHEEP.findHabit(habitId);
   if (!habit) return;
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int w = safe.width, h = safe.y + safe.height, center = safe.x + w / 2;
   const bool compact = renderer.getScreenHeight() <= 600;
   GUI.drawHeader(renderer,

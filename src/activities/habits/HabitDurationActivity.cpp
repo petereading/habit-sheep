@@ -37,7 +37,7 @@ struct TimerLayout {
 
 TimerLayout pomodoroLayout(const GfxRenderer& renderer, int count = 6) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int headerBottom = safe.y + metrics.topPadding + metrics.headerHeight;
   const bool compact = renderer.getScreenHeight() <= 600;
   const int phaseY = headerBottom + (compact ? 18 : 72);
@@ -50,7 +50,7 @@ TimerLayout pomodoroLayout(const GfxRenderer& renderer, int count = 6) {
 
 TimerLayout durationLayout(const GfxRenderer& renderer, int count = 6) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int digitsY =
       safe.y + metrics.topPadding + metrics.headerHeight + (renderer.getScreenHeight() <= 600 ? 44 : 100);
   const int barY = digitsY + (renderer.getScreenHeight() <= 600 ? 106 : 154);
@@ -277,7 +277,7 @@ void HabitDurationActivity::loop() {
   const HabitDefinition* currentHabit = HABIT_SHEEP.findHabit(habitId);
   const bool pomodoro = currentHabit && currentHabit->type == HabitType::Pomodoro;
   const TimerLayout layout = pomodoro ? pomodoroLayout(renderer, labels.count) : durationLayout(renderer, labels.count);
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const auto touch = mappedInput.rowTouch(row, layout.actionsY, layout.rowHeight, labels.count, safe.x + SIDE_PAD,
                                           safe.x + safe.width - SIDE_PAD, layout.rowHeight);
   if (touch == MappedInputManager::RowTouch::Tap) {
@@ -318,7 +318,7 @@ void HabitDurationActivity::loop() {
 
 void HabitDurationActivity::render(RenderLock&&) {
   renderer.clearScreen();
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int screenW = safe.width, center = safe.x + screenW / 2;
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect header{safe.x, safe.y + metrics.topPadding, screenW, metrics.headerHeight};

@@ -40,7 +40,7 @@ void SheepMemoryActivity::loop() {
     requestUpdate();
   }
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) select();
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int cardW = (safe.width - 48) / 4;
   const int cardH = (safe.height - 180) / 2;
   for (int i = 0; i < 8; ++i) {
@@ -54,7 +54,7 @@ void SheepMemoryActivity::loop() {
 
 void SheepMemoryActivity::render(RenderLock&&) {
   renderer.clearScreen();
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   habitUi::centeredText(renderer, UI_12_FONT_ID, safe.y + 20, tr(STR_SHEEP_MEMORY));
   habitUi::centeredText(renderer, SMALL_FONT_ID, safe.y + 65,
                         game.complete()  ? tr(STR_SHEEP_MEMORY_DONE)

@@ -62,7 +62,7 @@ void ink(const GfxRenderer& renderer, const ArtBitmap& bitmap, int x, int y, int
 namespace habitUi {
 void applyOrientation(GfxRenderer& renderer) { ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation()); }
 void centeredText(const GfxRenderer& renderer, const int font, const int y, const char* text) {
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   renderer.drawText(font, safe.x + (safe.width - renderer.getTextWidth(font, text)) / 2, y, text);
 }
 uint8_t iconFor(const HabitDefinition& habit) {

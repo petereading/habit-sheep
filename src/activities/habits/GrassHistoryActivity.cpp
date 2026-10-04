@@ -30,7 +30,7 @@ void GrassHistoryActivity::loop() {
     ++page;
     requestUpdate();
   }
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int bottom = safe.y + safe.height;
   if (mappedInput.wasTapInRect(safe.x + 24, bottom - 55, 140, 40) && page > 0) {
     --page;

@@ -25,7 +25,7 @@ void HabitIconActivity::loop() {
     selected = (selected + 1) % 24;
     requestUpdate();
   }
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int w = safe.width, h = safe.y + safe.height,
             top = safe.y + UITheme::getInstance().getMetrics().headerHeight +
                   UITheme::getInstance().getMetrics().topPadding + 20;
@@ -51,7 +51,7 @@ void HabitIconActivity::loop() {
 }
 void HabitIconActivity::render(RenderLock&&) {
   renderer.clearScreen();
-  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int w = safe.width, h = safe.y + safe.height;
   const int top = safe.y + UITheme::getInstance().getMetrics().headerHeight +
                   UITheme::getInstance().getMetrics().topPadding + 20,
