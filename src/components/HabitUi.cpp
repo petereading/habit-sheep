@@ -9,7 +9,9 @@
 
 #include "HabitEventLog.h"
 #include "HabitTimer.h"
+#include "activities/Activity.h"
 #include "activities/reader/ReaderUtils.h"
+#include "components/UITheme.h"
 #include "fontIds.h"
 #include "icons/habitArt.generated.h"
 
@@ -59,6 +61,10 @@ void ink(const GfxRenderer& renderer, const ArtBitmap& bitmap, int x, int y, int
 
 namespace habitUi {
 void applyOrientation(GfxRenderer& renderer) { ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation()); }
+void centeredText(const GfxRenderer& renderer, const int font, const int y, const char* text) {
+  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  renderer.drawText(font, safe.x + (safe.width - renderer.getTextWidth(font, text)) / 2, y, text);
+}
 uint8_t iconFor(const HabitDefinition& habit) {
   return habit.icon < 24 ? habit.icon : habit.type == HabitType::Pomodoro ? 1 : habit.readingIntegration ? 0 : 15;
 }

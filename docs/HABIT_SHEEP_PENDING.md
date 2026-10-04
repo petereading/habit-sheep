@@ -25,6 +25,7 @@ Updated 2026-10-04. P-019–P-033 and the tool-only Pomodoro decision are implem
 | Pause | Habit mode Off preserves history/timer time and freezes food/mood/bond decline. Home shows recent book; Cover becomes the default sleep mode with explicit user changes respected. Resume has no catch-up charges and leaves timer paused. |
 | Input compatibility | Existing CrossPoint hardware hints/navigation; direct touch targets for habits, sheep, grass, actions, minute presets, icons and history paging. |
 | Habits orientation | Settings → Habits → Habits Orientation: Portrait, Landscape CW, Portrait 180°, Landscape CCW, independent of Reading Orientation. Applied to Home, habit screens and Habit Sheep sleep; reader exit restores the Habits choice. |
+| Rotated controls | Timer, count, icon picker, memory game and history use CrossPoint's oriented safe area, leaving physical button hints clear on left/right/top edges. Render and touch bounds share the same geometry; landscape history uses the smaller font for seven readable rows. |
 
 ## Existing care rules preserved
 

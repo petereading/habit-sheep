@@ -7,6 +7,7 @@ struct HabitDefinition;
 
 namespace habitUi {
 void applyOrientation(GfxRenderer& renderer);
+void centeredText(const GfxRenderer& renderer, int font, int y, const char* text);
 uint8_t iconFor(const HabitDefinition& habit);
 const char* iconName(uint8_t icon);
 void icon(const GfxRenderer& renderer, uint8_t icon, int x, int y, int size);

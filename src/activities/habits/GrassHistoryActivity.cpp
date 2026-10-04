@@ -30,11 +30,13 @@ void GrassHistoryActivity::loop() {
     ++page;
     requestUpdate();
   }
-  if (mappedInput.wasTapInRect(24, renderer.getScreenHeight() - 95, 140, 40) && page > 0) {
+  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const int bottom = safe.y + safe.height;
+  if (mappedInput.wasTapInRect(safe.x + 24, bottom - 55, 140, 40) && page > 0) {
     --page;
     requestUpdate();
   }
-  if (mappedInput.wasTapInRect(renderer.getScreenWidth() - 164, renderer.getScreenHeight() - 95, 140, 40) && page < 1) {
+  if (mappedInput.wasTapInRect(safe.x + safe.width - 164, bottom - 55, 140, 40) && page < 1) {
     ++page;
     requestUpdate();
   }
@@ -54,17 +56,18 @@ void GrassHistoryActivity::render(RenderLock&&) {
            static_cast<unsigned>(SheepStateStore::GRASS_CAP));
   const int top = safe.y + metrics.topPadding + metrics.headerHeight + 15;
   habitUi::grass(renderer, left, top, 32);
-  renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top, stock);
-  renderer.drawCenteredText(SMALL_FONT_ID, top + 30, tr(STR_GRASS_HISTORY_HINT));
-  renderer.drawCenteredText(SMALL_FONT_ID, top + 50, tr(STR_GRASS_MEALS));
+  habitUi::centeredText(renderer, NOTOSANS_14_FONT_ID, top, stock);
+  habitUi::centeredText(renderer, SMALL_FONT_ID, top + 30, tr(STR_GRASS_HISTORY_HINT));
+  habitUi::centeredText(renderer, SMALL_FONT_ID, top + 50, tr(STR_GRASS_MEALS));
 
   tm today{};
   if (!halClock.isAvailable() || !halClock.localTime(today)) {
     renderer.drawCenteredText(NOTOSANS_14_FONT_ID, top + 85, tr(STR_GRASS_CLOCK_UNAVAILABLE));
   } else {
     const bool compact = renderer.getScreenHeight() <= 600;
-    const int rowH = std::min(compact ? 38 : 68, (renderer.getScreenHeight() - top - 180) / 7);
     const int listTop = top + (compact ? 78 : 85);
+    const int rowH = std::min(compact ? 38 : 68, (safe.y + safe.height - 55 - listTop - 12) / 7);
+    const int font = compact ? SMALL_FONT_ID : NOTOSANS_14_FONT_ID;
     for (int i = 0; i < 7; ++i) {
       tm day = today;
       day.tm_mday -= page * 7 + i;
@@ -77,7 +80,7 @@ void GrassHistoryActivity::render(RenderLock&&) {
       char date[18];
       strftime(date, sizeof(date), "%a %d %b", &day);
       const int y = listTop + i * rowH;
-      renderer.drawText(NOTOSANS_14_FONT_ID, left, y, date);
+      renderer.drawText(font, left, y, date);
       char amounts[28];
       if (entry.day)
         snprintf(amounts, sizeof(amounts), tr(STR_GRASS_HISTORY_ROW), static_cast<unsigned>(entry.earned),
@@ -85,15 +88,15 @@ void GrassHistoryActivity::render(RenderLock&&) {
       else
         snprintf(amounts, sizeof(amounts), "%s", tr(STR_GRASS_NO_ENTRY));
       if (entry.paused) renderer.drawText(SMALL_FONT_ID, safe.x + safe.width / 2 - 30, y + 2, tr(STR_GRASS_PAUSED));
-      renderer.drawText(NOTOSANS_14_FONT_ID, right - renderer.getTextWidth(NOTOSANS_14_FONT_ID, amounts), y, amounts);
+      renderer.drawText(font, right - renderer.getTextWidth(font, amounts), y, amounts);
       if (i < 6) renderer.drawLine(left, y + rowH - 2, right, y + rowH - 2, true);
     }
   }
-  habitUi::frame(renderer, 24, renderer.getScreenHeight() - 95, 140, 38, false);
-  habitUi::frame(renderer, renderer.getScreenWidth() - 164, renderer.getScreenHeight() - 95, 140, 38, false);
-  renderer.drawText(SMALL_FONT_ID, 35, renderer.getScreenHeight() - 87, tr(STR_GRASS_NEWER));
-  renderer.drawText(SMALL_FONT_ID, renderer.getScreenWidth() - 153, renderer.getScreenHeight() - 87,
-                    tr(STR_GRASS_OLDER));
+  const int bottom = safe.y + safe.height;
+  habitUi::frame(renderer, safe.x + 24, bottom - 55, 140, 38, false);
+  habitUi::frame(renderer, safe.x + safe.width - 164, bottom - 55, 140, 38, false);
+  renderer.drawText(SMALL_FONT_ID, safe.x + 35, bottom - 47, tr(STR_GRASS_NEWER));
+  renderer.drawText(SMALL_FONT_ID, safe.x + safe.width - 153, bottom - 47, tr(STR_GRASS_OLDER));
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), "", tr(STR_GRASS_NEWER), tr(STR_GRASS_OLDER));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);

@@ -34,9 +34,10 @@ void HabitCountActivity::loop() {
     return;
   }
   if (!HABIT_SHEEP.isEnabled()) return;
-  const int h = renderer.getScreenHeight();
+  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const int h = safe.y + safe.height;
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
-      mappedInput.wasTapInRect(24, h - 140, renderer.getScreenWidth() - 48, 62)) {
+      mappedInput.wasTapInRect(safe.x + 24, h - 100, safe.width - 48, 62)) {
     const auto* habit = HABIT_SHEEP.findHabit(habitId);
     if (!habit) return;
     const char* options[] = {tr(STR_CANCEL), tr(STR_HABIT_LOG_ONE)};
@@ -50,17 +51,18 @@ void HabitCountActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const auto* habit = HABIT_SHEEP.findHabit(habitId);
   if (!habit) return;
-  const int w = renderer.getScreenWidth(), h = renderer.getScreenHeight();
-  const bool compact = h <= 600;
-  GUI.drawHeader(
-      renderer,
-      Rect{0, UITheme::getInstance().getMetrics().topPadding, w, UITheme::getInstance().getMetrics().headerHeight},
-      habit->name.c_str(), nullptr, true, true);
+  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const int w = safe.width, h = safe.y + safe.height, center = safe.x + w / 2;
+  const bool compact = renderer.getScreenHeight() <= 600;
+  GUI.drawHeader(renderer,
+                 Rect{safe.x, safe.y + UITheme::getInstance().getMetrics().topPadding, w,
+                      UITheme::getInstance().getMetrics().headerHeight},
+                 habit->name.c_str(), nullptr, true, true);
   const int top =
-      UITheme::getInstance().getMetrics().topPadding + UITheme::getInstance().getMetrics().headerHeight + 12;
-  habitUi::icon(renderer, habitUi::iconFor(*habit), w / 2 - 24, top, 48);
+      safe.y + UITheme::getInstance().getMetrics().topPadding + UITheme::getInstance().getMetrics().headerHeight + 12;
+  habitUi::icon(renderer, habitUi::iconFor(*habit), center - 24, top, 48);
   const bool weekly = habit->period == HabitPeriod::Weekly;
-  renderer.drawCenteredText(SMALL_FONT_ID, top + 56, weekly ? tr(STR_HABIT_THIS_WEEK) : tr(STR_HABIT_TODAY));
+  habitUi::centeredText(renderer, SMALL_FONT_ID, top + 56, weekly ? tr(STR_HABIT_THIS_WEEK) : tr(STR_HABIT_TODAY));
   if (weekly) {
     tm local{};
     if (halClock.localTime(local)) {
@@ -75,7 +77,7 @@ void HabitCountActivity::render(RenderLock&&) {
       mktime(&local);
       strftime(last, sizeof(last), "%d %b", &local);
       snprintf(range, sizeof(range), "%s - %s", first, last);
-      renderer.drawCenteredText(SMALL_FONT_ID, top + 82, range);
+      habitUi::centeredText(renderer, SMALL_FONT_ID, top + 82, range);
     }
   }
   const uint16_t count =
@@ -83,12 +85,12 @@ void HabitCountActivity::render(RenderLock&&) {
   char unit[24];
   snprintf(unit, sizeof(unit), "/ %u %s", habit->targetCount, tr(STR_HABIT_TIMES));
   const int digits = top + (weekly ? 112 : 94), size = compact ? 70 : 112;
-  habitUi::number(renderer, w / 2, digits, count, unit, size);
-  habitUi::progress(renderer, 24, digits + size + 20, w - 48, count, habit->targetCount);
-  const int sheepTop = digits + size + 42, sheepH = std::max(0, h - 162 - sheepTop);
-  if (sheepH >= 60) habitUi::sheep(renderer, w / 2 - 80, sheepTop, 160, sheepH, 2);
-  habitUi::frame(renderer, 24, h - 140, w - 48, 62);
-  renderer.drawCenteredText(NOTOSANS_14_FONT_ID, h - 125, tr(STR_HABIT_LOG_ONE));
+  habitUi::number(renderer, center, digits, count, unit, size);
+  habitUi::progress(renderer, safe.x + 24, digits + size + 20, w - 48, count, habit->targetCount);
+  const int sheepTop = digits + size + 42, sheepH = std::max(0, h - 122 - sheepTop);
+  if (sheepH >= 60) habitUi::sheep(renderer, center - 80, sheepTop, 160, sheepH, 2);
+  habitUi::frame(renderer, safe.x + 24, h - 100, w - 48, 62);
+  habitUi::centeredText(renderer, NOTOSANS_14_FONT_ID, h - 85, tr(STR_HABIT_LOG_ONE));
   if (popup.processRender(renderer, mappedInput)) return;
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);

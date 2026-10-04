@@ -40,10 +40,11 @@ void SheepMemoryActivity::loop() {
     requestUpdate();
   }
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) select();
-  const int cardW = (renderer.getScreenWidth() - 48) / 4;
-  const int cardH = (renderer.getScreenHeight() - 220) / 2;
+  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  const int cardW = (safe.width - 48) / 4;
+  const int cardH = (safe.height - 180) / 2;
   for (int i = 0; i < 8; ++i) {
-    if (mappedInput.wasTapInRect(24 + (i % 4) * cardW, 110 + (i / 4) * cardH, cardW - 8, cardH - 8)) {
+    if (mappedInput.wasTapInRect(safe.x + 24 + (i % 4) * cardW, safe.y + 110 + (i / 4) * cardH, cardW - 8, cardH - 8)) {
       selection = i;
       select();
       break;
@@ -53,16 +54,17 @@ void SheepMemoryActivity::loop() {
 
 void SheepMemoryActivity::render(RenderLock&&) {
   renderer.clearScreen();
-  renderer.drawCenteredText(UI_12_FONT_ID, 20, tr(STR_SHEEP_MEMORY));
-  renderer.drawCenteredText(SMALL_FONT_ID, 65,
-                            game.complete()  ? tr(STR_SHEEP_MEMORY_DONE)
-                            : game.hasMiss() ? tr(STR_SHEEP_MEMORY_HIDE)
-                                             : tr(STR_SHEEP_MEMORY_HELP));
-  const int cardW = (renderer.getScreenWidth() - 48) / 4;
-  const int cardH = (renderer.getScreenHeight() - 220) / 2;
+  const Rect safe = GUI.getScreenSafeArea(renderer, true, false);
+  habitUi::centeredText(renderer, UI_12_FONT_ID, safe.y + 20, tr(STR_SHEEP_MEMORY));
+  habitUi::centeredText(renderer, SMALL_FONT_ID, safe.y + 65,
+                        game.complete()  ? tr(STR_SHEEP_MEMORY_DONE)
+                        : game.hasMiss() ? tr(STR_SHEEP_MEMORY_HIDE)
+                                         : tr(STR_SHEEP_MEMORY_HELP));
+  const int cardW = (safe.width - 48) / 4;
+  const int cardH = (safe.height - 180) / 2;
   for (int i = 0; i < 8; ++i) {
-    const int x = 24 + (i % 4) * cardW;
-    const int y = 110 + (i / 4) * cardH;
+    const int x = safe.x + 24 + (i % 4) * cardW;
+    const int y = safe.y + 110 + (i / 4) * cardH;
     renderer.drawRoundedRect(x, y, cardW - 8, cardH - 8, selection == i ? 3 : 1, 8, true);
     const int cx = x + (cardW - 8) / 2;
     const int cy = y + (cardH - 8) / 2;
@@ -73,12 +75,12 @@ void SheepMemoryActivity::render(RenderLock&&) {
     }
   }
   if (game.complete()) {
-    const int w = renderer.getScreenWidth() - 64, y = renderer.getScreenHeight() / 2 - 100;
-    renderer.fillRoundedRect(32, y, w, 180, 12, Color::White);
-    habitUi::popupFrame(renderer, 32, y, w, 180);
-    habitUi::sheep(renderer, renderer.getScreenWidth() / 2 - 60, y + 16, 120, 90, 2);
-    UITheme::drawCenteredWrappedText(renderer, Rect{48, y + 112, w - 32, 58}, SMALL_FONT_ID, tr(STR_SHEEP_MEMORY_DONE),
-                                     2);
+    const int w = safe.width - 64, y = safe.y + safe.height / 2 - 100;
+    renderer.fillRoundedRect(safe.x + 32, y, w, 180, 12, Color::White);
+    habitUi::popupFrame(renderer, safe.x + 32, y, w, 180);
+    habitUi::sheep(renderer, safe.x + safe.width / 2 - 60, y + 16, 120, 90, 2);
+    UITheme::drawCenteredWrappedText(renderer, Rect{safe.x + 48, y + 112, w - 32, 58}, SMALL_FONT_ID,
+                                     tr(STR_SHEEP_MEMORY_DONE), 2);
   }
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);
