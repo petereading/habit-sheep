@@ -93,10 +93,12 @@ void GrassHistoryActivity::render(RenderLock&&) {
     }
   }
   const int bottom = safe.y + safe.height;
-  habitUi::frame(renderer, safe.x + 24, bottom - 55, 140, 38, false);
-  habitUi::frame(renderer, safe.x + safe.width - 164, bottom - 55, 140, 38, false);
-  renderer.drawText(SMALL_FONT_ID, safe.x + 35, bottom - 47, tr(STR_GRASS_NEWER));
-  renderer.drawText(SMALL_FONT_ID, safe.x + safe.width - 153, bottom - 47, tr(STR_GRASS_OLDER));
+  if (mappedInput.hasTouch()) {
+    habitUi::frame(renderer, safe.x + 24, bottom - 55, 140, 38, false);
+    habitUi::frame(renderer, safe.x + safe.width - 164, bottom - 55, 140, 38, false);
+    renderer.drawText(SMALL_FONT_ID, safe.x + 35, bottom - 47, tr(STR_GRASS_NEWER));
+    renderer.drawText(SMALL_FONT_ID, safe.x + safe.width - 153, bottom - 47, tr(STR_GRASS_OLDER));
+  }
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), "", tr(STR_GRASS_NEWER), tr(STR_GRASS_OLDER));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);

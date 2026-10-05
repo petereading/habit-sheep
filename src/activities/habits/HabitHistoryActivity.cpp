@@ -47,11 +47,11 @@ void HabitHistoryActivity::loop() {
   }
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   if (mappedInput.wasReleased(MappedInputManager::Button::NavPrevious) ||
-      mappedInput.wasTapInRect(safe.x + 24, safe.y + safe.height - 48, 140, 40)) {
+      mappedInput.wasTapInRect(safe.x + 24, safe.y + safe.height - 55, 140, 40)) {
     page = 0;
     requestUpdate();
   } else if (mappedInput.wasReleased(MappedInputManager::Button::NavNext) ||
-             mappedInput.wasTapInRect(safe.x + safe.width - 164, safe.y + safe.height - 48, 140, 40)) {
+             mappedInput.wasTapInRect(safe.x + safe.width - 164, safe.y + safe.height - 55, 140, 40)) {
     page = 1;
     requestUpdate();
   }
@@ -104,8 +104,13 @@ void HabitHistoryActivity::render(RenderLock&&) {
   }
   if (!readable)
     habitUi::centeredText(renderer, SMALL_FONT_ID, safe.y + safe.height - 76, tr(STR_HABIT_HISTORY_FAILED));
-  renderer.drawText(SMALL_FONT_ID, safe.x + 24, safe.y + safe.height - 42, tr(STR_GRASS_NEWER));
-  renderer.drawText(SMALL_FONT_ID, safe.x + safe.width - 164, safe.y + safe.height - 42, tr(STR_GRASS_OLDER));
+  if (mappedInput.hasTouch()) {
+    const int bottom = safe.y + safe.height;
+    habitUi::frame(renderer, safe.x + 24, bottom - 55, 140, 38, false);
+    habitUi::frame(renderer, safe.x + safe.width - 164, bottom - 55, 140, 38, false);
+    renderer.drawText(SMALL_FONT_ID, safe.x + 35, bottom - 47, tr(STR_GRASS_NEWER));
+    renderer.drawText(SMALL_FONT_ID, safe.x + safe.width - 153, bottom - 47, tr(STR_GRASS_OLDER));
+  }
   const auto hints = mappedInput.mapLabels(tr(STR_BACK), "", tr(STR_GRASS_NEWER), tr(STR_GRASS_OLDER));
   GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);

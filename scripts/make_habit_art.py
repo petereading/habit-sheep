@@ -77,8 +77,7 @@ def character(i, face_color='black', leg_color='black'):
     return '<g transform="translate(12 10) scale(.9)">%s</g>' % scene
 
 
-for i in range(20):
-    svg(f'sheep_{i:02}', character(i))
+# Approved sheep SVG contours are source assets; do not redraw them here.
 for variant in range(4):
     svg(f'pair_{variant:02}', character(0, 'white' if variant & 1 else 'black',
                                      'white' if variant & 2 else 'black'))

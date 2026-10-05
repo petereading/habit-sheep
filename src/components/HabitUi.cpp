@@ -77,14 +77,15 @@ void icon(const GfxRenderer& r, uint8_t value, int x, int y, int size) {
 void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t pose, uint8_t variant, bool mirrored,
            uint8_t effectStep) {
   const int w = std::min(width, height * 4 / 3), h = w * 3 / 4;
-  ink(r, variant < 4 ? PAIRS[variant] : SHEEP[pose % 20], x + (width - w) / 2, y + (height - h) / 2, w, h, mirrored);
+  const int drawX = x + (width - w) / 2, drawY = y + (height - h) / 2;
+  ink(r, variant < 4 ? PAIRS[variant] : SHEEP[pose % 20], drawX, drawY, w, h, mirrored);
+  const bool headLeft = (pose == 13 || pose == 18) != mirrored;
+  const int effectX = drawX + (headLeft ? w / 6 : w * 5 / 6);
   if (variant >= 4 && (pose == 13 || pose == 14)) {
-    const int zx = mirrored ? x + w / 6 : x + w * 5 / 6;
-    r.drawText(SMALL_FONT_ID, zx, y, tr(STR_SHEEP_Z));
+    r.drawText(SMALL_FONT_ID, effectX, drawY, tr(STR_SHEEP_Z));
   }
   if (variant >= 4 && pose == 18)
-    ink(r, habitArt::heart_empty, mirrored ? x + w / 6 : x + w * 5 / 6,
-        y + (2 - std::min<uint8_t>(2, effectStep)) * w / 16, w / 10, w / 10);
+    ink(r, habitArt::heart_empty, effectX, drawY + (2 - std::min<uint8_t>(2, effectStep)) * w / 16, w / 10, w / 10);
 }
 void grass(const GfxRenderer& r, int x, int y, int size) { ink(r, habitArt::grass, x, y, size, size); }
 void grassStock(const GfxRenderer& r, int right, int y, int size, uint8_t stock) {

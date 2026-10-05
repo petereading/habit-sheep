@@ -95,6 +95,12 @@ Balancing intent: three grass earned covers three daily meals. Three 30-minute s
 - Each habit edit menu has History / statistics: two seven-day pages, date totals and a 14-day summary. Counts use actual logged completions, Pomodoro uses actual focus records, duration shows accumulated minutes and sessions derived using the current interval. Weekly remainder is attributed on the day it completes, reading up to six preceding days to seed the first displayed week. Changing interval changes these session estimates, never food/history events. The aggregate grass ledger remains separate. Missing dates show zero activity; read failures show a notice.
 - Game/history activities use fallible screen-lifetime ownership. Puzzle state is fixed arrays; history holds fourteen rows/counts and one 512-byte parser scratch buffer in its activity, avoiding a new render stack buffer or new global cache. Scenes and loops share the existing RenderLock.
 
+## Artwork fidelity and history controls — 2026-10-05 correction
+
+The e7b4d83 sheep was manually reconstructed geometry and departed from the approved illustration proportions. Replace its twenty scene sources with monochrome pixel-contour SVGs taken from the approved awake/eating/interaction sheet and four-rest sheet. Original shape, head/body proportions, feet and expression are retained; detached labels/hearts/Z are removed, with upright heart/Z overlays placed on the correct head side. The icon-generation script preserves these SVG sources instead of redrawing them. PBM size stays 384×288, flash-only, without another framebuffer. Pixel contours preserve the approved illustration rather than promising infinite-resolution vector curves.
+
+Both grass and individual habit history show their two on-screen paging buttons only when MappedInputManager reports touch capability. The hardware-only UI keeps CrossPoint's mapped bottom hints; touch themes already suppress those hints. Habit history uses the same single-outline touch buttons and tap rectangles as grass history. X3 checks: only one Newer/Older control set; touch check: visible buttons still page correctly.
+
 ## X3 verification checklist
 
 1. Check unframed habit icons, single-outline focus and double-outline popups. Check battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses. Navigate all slots, grass, sheep and dock. Set each Habits orientation, return from a differently oriented reader and check habit/settings navigation and sleep. Confirm smaller sheep, no ground and frame margin above the dock.
