@@ -28,6 +28,8 @@ class HabitEventLog {
 
   bool refreshToday();
   HabitDailyProgress progressForToday(const std::string& habitId);
+  bool progressOnDay(const std::string& habitId, const char* day, HabitDailyProgress& result, char* line,
+                     size_t capacity) const;
   uint16_t completionCountForWeek(const std::string& habitId);
   uint32_t durationSecondsForPeriod(const HabitDefinition& habit, const char* day = nullptr);
   bool appendCompletion(const std::string& habitId, HabitEventSource source = HabitEventSource::Manual);

@@ -1,6 +1,6 @@
 # Habit Sheep — implemented screens and X3 verification
 
-Updated 2026-10-04. P-019–P-033 and the tool-only Pomodoro decision are implemented for the next hardware test. Ground removal supersedes the earlier curved-ground treatment. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
+Updated 2026-10-05. The second artwork/game/history batch is implemented for X3 testing. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
 
 ## Current implementation
 
@@ -10,14 +10,14 @@ Updated 2026-10-04. P-019–P-033 and the tool-only Pomodoro decision are implem
 | Dock, left to right | Continue reading, Browse files, Library, OPDS, Transfer, Settings. |
 | Immediate tracker access | Select or tap grass stock on Home to open 14-day grass history. Settings → Habits retains the same entry. |
 | Empty habit slots | Rounded dashed placeholders; focus/tap opens Choose habit. Nine saved habits, three active. |
-| Sheep interactions | Selecting the sheep opens a double-line panel titled with its name, with Pet, Call and Play. Responses expire after ten seconds; foraging cannot be bypassed by calling. |
+| Sheep interactions | Short Confirm/tap on the sheep starts a random three-stage interaction, with two-second keyframes and a final smile/heart held to ten seconds. Long Confirm/long touch opens the named 2×2 game popup. Long presses suppress release/tap. Food accounting takes priority over interaction artwork. |
 | Icons | 24 original monochrome icons, including Reading, Focus, Family, Relationship, Money, Phone and five general choices (Star, Flag, Target, Check, Sun). Device and web settings preserve choices. Older habits derive defaults. |
 | Reading and timed habits | One cumulative total combines device reading, paper-book timing and manual minutes. Large whole-session number, smaller `/ target sessions`, accumulated minutes and session length. Daily/weekly targets are independent of rewards. Session length 1–1440 min and target 1–99 can be configured on device and web. |
 | Manual minutes | 5/10/15/20/30/45/60/Custom grid, cumulative total preview and confirmation. Custom uses the existing interval chooser. |
 | Daily/weekly counts | Dedicated progress screen, week date range and confirmed Log one action. Week starts on any chosen weekday, default Monday. |
 | Pomodoro | Tool without a daily target. Home shows today's completed sessions; timer shows focuses until long break and phase progress. Default four focuses controls long breaks, not a reward goal. Manual breaks; Skip short break immediately starts focus. Unified `min`. |
 | Completion | Count/focus completions show double-line positive notices and actual gain or full-stock/save-failure notice. Reading/timed sessions award silently. |
-| Sheep pairs | Four visual sheep pairs distinguished by black/white faces and legs. No numbers. Access through Play; removed from Habits settings. |
+| Games | Pairs has six houses/three pairs: selecting opens a door, a miss stays visible until acknowledged, and matched houses remain open with a check. Find different, Remember sheep and Sheep order fill the other three 2×2 menu entries. Previous/Next/Confirm/Back and direct touch work throughout. Remember waits for user confirmation to hide; order swaps two selected sheep. No timed reflexes, dragging or food rewards. |
 | Grass presentation | `Grass 21 / 21` in text settings; seven right-aligned three-blade symbols on Home and sleep (one blade per unit). Exact numerical stock in history. No decorative grass or ground line in sheep scenes. |
 | Awake poses | Twelve poses, ten-minute intervals, no repeat within two hours. Missed meals override with rest; only zero mood shows the foraging sign. |
 | Sleep selection | Display → Sleep Screen → Habit Sheep. No separate Sleep sheep scene setting. Date, battery without percentage, hearts below date, sheep, three passive habit progress icons. |
@@ -87,6 +87,14 @@ Pomodoro has no daily target. Its saved cycle counter survives midnight and rest
 
 Balancing intent: three grass earned covers three daily meals. Three 30-minute sessions take 90 minutes; users may lower reading session duration if needed. This reward decision alone does not change the current default Pomodoro focus duration of 25 minutes or silently make it 30 minutes.
 
+## New X3 feedback — 2026-10-05, implemented
+
+- Twenty native SVG poses follow the approved proportions/color scheme: white wool/forehead/tail, black long face/ears/legs, standalone smile without a linked nose. Twelve awake, four distinct rest/sleep, two eating, two interaction poses. Stable date/pose-slot pseudorandom mirroring supplies both directions without duplicating bitmap arrays; Z and heart overlays remain upright. SVGs are re-rasterized to 384×288 for sheep and 192×192 for icons. No new framebuffer or runtime bitmap allocation. Smaller icons retain monochrome pixel edges, but are no longer enlarged from 48×48 sources.
+- Eating includes visible grass at the lowered mouth or protruding while chewing. Only feeding has grass. Home no longer lets automatic sleep interrupt the five-minute meal window; manual power sleep remains available. Meal and minute-change checks both execute rather than short-circuiting. The user's flash cause is unproven and requires hardware verification; these changes address visibility and interruptions without changing meal charges.
+- Pairs and three other games are accessed by long-press on the sheep. Short press interacts; original Pet/Call panel is replaced. Hardware hints identify the long-press game entry. Black/white face/leg combinations are reserved for game sheep; the companion keeps the agreed black face/legs.
+- Each habit edit menu has History / statistics: two seven-day pages, date totals and a 14-day summary. Counts use actual logged completions, Pomodoro uses actual focus records, duration shows accumulated minutes and sessions derived using the current interval. Weekly remainder is attributed on the day it completes, reading up to six preceding days to seed the first displayed week. Changing interval changes these session estimates, never food/history events. The aggregate grass ledger remains separate. Missing dates show zero activity; read failures show a notice.
+- Game/history activities use fallible screen-lifetime ownership. Puzzle state is fixed arrays; history holds fourteen rows/counts and one 512-byte parser scratch buffer in its activity, avoiding a new render stack buffer or new global cache. Scenes and loops share the existing RenderLock.
+
 ## X3 verification checklist
 
 1. Check unframed habit icons, single-outline focus and double-outline popups. Check battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses. Navigate all slots, grass, sheep and dock. Set each Habits orientation, return from a differently oriented reader and check habit/settings navigation and sleep. Confirm smaller sheep, no ground and frame margin above the dock.
@@ -95,10 +103,13 @@ Balancing intent: three grass earned covers three daily meals. Three 30-minute s
 4. Combine device reading, paper timing and manual additions. Verify one total, Cancel has no effect and each whole session earns one, even beyond target, without per-session popups. Test partial sessions, restart, length edits and daily/weekly boundaries: no retroactive or duplicate rewards.
 5. Complete daily and weekly count habits several times. Verify date range and Monday/default or a changed boundary. Check positive/full-stock notices.
 6. Finish a Pomodoro, leave the break waiting, then Skip break. Repeat during a running short break. Focus starts immediately; +1 per focus, no break/cycle bonus. Home has no daily denominator; cycle setting means focuses before long break.
-7. Use Pet/Call/Play repeatedly, create/rename/delete habits and open chained confirmations. Play several rounds, return Home and read for at least thirty minutes. If it freezes again, record the last screen/action and capture Serial panic/backtrace, free heap and largest block if available.
-8. Leave Home awake for two hours: twelve ten-minute poses, hearts without Mood, no drawn grass. A Pet/Call response returns to the current pose after ten seconds.
+7. Use short-press interaction and long-press Games repeatedly, create/rename/delete habits and open chained confirmations. Play several rounds, return Home and read for at least thirty minutes. If it freezes again, record the last screen/action and capture Serial panic/backtrace, free heap and largest block if available.
+8. Leave Home awake for two hours: twelve ten-minute poses, hearts without Mood, no drawn grass. An interaction response returns to the current pose after ten seconds.
 9. Select Habit Sheep sleep mode before a meal. Check exactly one grass deducted, five-minute eating scene, then rest. Leave asleep across half-hour boundaries and wake manually. Compare overnight battery use with Cover sleep mode; scheduled wakes are X3-specific and require device validation.
 10. With no stock, verify missed meals show rest while hearts remain positive; zero hearts shows the foraging sign. Earn grass to return the sheep. Pause/resume and confirm there are no catch-up meal charges or automatic timer resume.
+
+11. Play Pairs (six houses), Find different, Remember sheep and Sheep order using buttons. Confirm a wrong answer stays visible until acknowledged. Repeat by touch where available. Confirm long-press does not also trigger short-press interaction.
+12. Open each habit’s History / statistics, check fourteen dates against known reading/count/focus records and test a weekly remainder crossing the first displayed date.
 
 ## Engineering and validation
 
@@ -106,6 +117,6 @@ Artwork uses committed SVG/PBM sources and a stdlib-only PlatformIO generator. P
 
 Automated tests compile the real stores, event log and timer against deterministic HAL/storage, and the real popup callback and scene scheduling helpers. Final CI/build status and firmware provenance are attached to PR #1. Actual battery behavior, e-ink refresh quality, button/touch usability and the reported freeze require the user's X3 test.
 
-AI, sync, further games/interactions and per-habit analytics have no approved specification and remain future scope. The older three-row interaction concept was superseded by three top habits and the sheep popup, so no redundant top interaction row is added.
+AI, sync and additional games beyond the four approved here remain future scope. The older three-row interaction concept was superseded by three top habits and the sheep popup, so no redundant top interaction row is added.
 
 Weekly timed progress reuses the existing nine-entry reserved week cache, adding seconds/validity fields rather than a second allocation. New interval pickers are ActivityManager-owned, nothrow-allocated and OOM-checked; copied habits are screen-lifetime only. Timer date tracking adds a fixed 16-byte day per existing session, with no additional timer allocation. Source evidence: `HabitEventLog.cpp:359–427` replaces goal-gated rewards; `HabitTimer.cpp:39–68` dates live timer fragments; `HabitSheepHomeUi.cpp:159–182` removes ground and insets sheep focus. Final CI provenance belongs to PR #1.

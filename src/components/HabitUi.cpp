@@ -28,7 +28,7 @@ constexpr ArtBitmap SHEEP[] = {habitArt::sheep_00, habitArt::sheep_01, habitArt:
                                habitArt::sheep_04, habitArt::sheep_05, habitArt::sheep_06, habitArt::sheep_07,
                                habitArt::sheep_08, habitArt::sheep_09, habitArt::sheep_10, habitArt::sheep_11,
                                habitArt::sheep_12, habitArt::sheep_13, habitArt::sheep_14, habitArt::sheep_15,
-                               habitArt::sheep_16, habitArt::sheep_17};
+                               habitArt::sheep_16, habitArt::sheep_17, habitArt::sheep_18, habitArt::sheep_19};
 constexpr ArtBitmap PAIRS[] = {habitArt::pair_00, habitArt::pair_01, habitArt::pair_02, habitArt::pair_03};
 constexpr ArtBitmap GRASS_STOCK[] = {habitArt::grass_stock_0, habitArt::grass_stock_1, habitArt::grass_stock_2,
                                      habitArt::grass_stock_3};
@@ -40,14 +40,16 @@ constexpr StrId NAMES[] = {
     StrId::STR_ICON_FAMILY,  StrId::STR_ICON_RELATIONSHIP, StrId::STR_ICON_MONEY,    StrId::STR_ICON_PHONE,
     StrId::STR_ICON_FLAG,    StrId::STR_ICON_TARGET,       StrId::STR_ICON_CHECK,    StrId::STR_ICON_SUN};
 
-void ink(const GfxRenderer& renderer, const ArtBitmap& bitmap, int x, int y, int width, int height) {
+void ink(const GfxRenderer& renderer, const ArtBitmap& bitmap, int x, int y, int width, int height,
+         bool mirrored = false) {
   if (width <= 0 || height <= 0) return;
   const int stride = (bitmap.width + 7) / 8;
   for (int row = 0; row < height; ++row) {
     const int sourceY = row * bitmap.height / height;
     int run = -1;
     for (int col = 0; col <= width; ++col) {
-      const int sourceX = col * bitmap.width / width;
+      const int sampleX = col * bitmap.width / width;
+      const int sourceX = mirrored ? bitmap.width - 1 - sampleX : sampleX;
       const bool black = col < width && (bitmap.data[sourceY * stride + sourceX / 8] & (0x80 >> (sourceX % 8)));
       if (black && run < 0) run = col;
       if (!black && run >= 0) {
@@ -72,9 +74,17 @@ const char* iconName(uint8_t value) { return I18N.get(NAMES[value < 24 ? value :
 void icon(const GfxRenderer& r, uint8_t value, int x, int y, int size) {
   ink(r, ICONS[value < 24 ? value : 15], x, y, size, size);
 }
-void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t pose, uint8_t variant) {
+void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t pose, uint8_t variant, bool mirrored,
+           uint8_t effectStep) {
   const int w = std::min(width, height * 4 / 3), h = w * 3 / 4;
-  ink(r, variant < 4 ? PAIRS[variant] : SHEEP[pose % 18], x + (width - w) / 2, y + (height - h) / 2, w, h);
+  ink(r, variant < 4 ? PAIRS[variant] : SHEEP[pose % 20], x + (width - w) / 2, y + (height - h) / 2, w, h, mirrored);
+  if (variant >= 4 && (pose == 13 || pose == 14)) {
+    const int zx = mirrored ? x + w / 6 : x + w * 5 / 6;
+    r.drawText(SMALL_FONT_ID, zx, y, tr(STR_SHEEP_Z));
+  }
+  if (variant >= 4 && pose == 18)
+    ink(r, habitArt::heart_empty, mirrored ? x + w / 6 : x + w * 5 / 6,
+        y + (2 - std::min<uint8_t>(2, effectStep)) * w / 16, w / 10, w / 10);
 }
 void grass(const GfxRenderer& r, int x, int y, int size) { ink(r, habitArt::grass, x, y, size, size); }
 void grassStock(const GfxRenderer& r, int right, int y, int size, uint8_t stock) {

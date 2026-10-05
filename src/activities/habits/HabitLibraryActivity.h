@@ -51,4 +51,5 @@ class HabitLibraryActivity final : public UiListActivity {
   void toggleReadingIntegration(const std::string& habitId);
   void confirmDelete(const std::string& habitId);
   void changeIcon(const std::string& habitId);
+  void showHistory(const std::string& habitId);
 };

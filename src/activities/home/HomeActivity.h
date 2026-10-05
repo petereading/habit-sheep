@@ -87,6 +87,7 @@ class HomeActivity final : public Activity {
   void loopHabitSheepHome();
   void activateHabitSheepSelection();
   void showHabitReplacementPicker(int slot);
+  void showSheepGames();
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -99,4 +100,5 @@ class HomeActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
   bool isHomeActivity() const override { return true; }
+  bool preventAutoSleep() override;
 };

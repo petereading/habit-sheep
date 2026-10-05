@@ -94,8 +94,16 @@ void HabitSheepHomeUi::setSelection(int value) { selection = std::clamp(value, 0
 void HabitSheepHomeUi::nudgeSheep(uint8_t action) {
   sheepNudge = action + 1;
   nudgeStartedMs = millis();
+  nudgeFrame = 0;
 }
 bool HabitSheepHomeUi::expireNudge() {
+  if (sheepNudge && millis() - nudgeStartedMs < 10000) {
+    const uint8_t frame = std::min<unsigned long>(2, (millis() - nudgeStartedMs) / 2000);
+    if (frame != nudgeFrame) {
+      nudgeFrame = frame;
+      return true;
+    }
+  }
   if (sheepNudge && millis() - nudgeStartedMs >= 10000) {
     sheepNudge = 0;
     return true;
@@ -129,9 +137,12 @@ int HabitSheepHomeUi::longPressedHabit(MappedInputManager& input) const {
   if (!HABIT_SHEEP.isEnabled()) return -1;
   const auto l = layout(renderer);
   int x = 0, y = 0;
-  if (input.wasScreenLongPress(x, y) && x >= PAD && x < renderer.getScreenWidth() - PAD && y >= l.habitTop &&
-      y < l.statusTop)
-    return std::clamp((x - PAD) / ((renderer.getScreenWidth() - PAD * 2) / 3), 0, 2);
+  if (input.wasScreenLongPress(x, y) && x >= PAD && x < renderer.getScreenWidth() - PAD) {
+    if (y >= l.sheepTop && y < l.sheepTop + l.sheepHeight) return 3;
+    if (y >= l.habitTop && y < l.statusTop)
+      return std::clamp((x - PAD) / ((renderer.getScreenWidth() - PAD * 2) / 3), 0, 2);
+  }
+  if (selection == 0 && input.wasLongPressed(MappedInputManager::Button::Confirm, 700)) return 3;
   if (selection >= 1 && selection <= 3 && input.wasLongPressed(MappedInputManager::Button::Confirm, 700))
     return selection - 1;
   return -1;
@@ -151,12 +162,17 @@ void HabitSheepHomeUi::drawSheep(int x, int y, int width, int height, bool showS
     renderer.drawText(SMALL_FONT_ID, sx + 12, sy + 52, hint.c_str());
   } else {
     uint8_t pose = sheepScene::pose(local, !showSelection, SHEEP_STATE.isResting(), SHEEP_STATE.ateCurrentMeal(local));
-    if (showSelection && sheepNudge) pose = sheepNudge == 1 ? 2 : 3;
+    const bool eating = SHEEP_STATE.ateCurrentMeal(local);
+    if (showSelection && sheepNudge && !eating) {
+      constexpr uint8_t responses[4][3] = {{19, 18, 18}, {0, 7, 18}, {19, 2, 18}, {2, 8, 18}};
+      pose = responses[(sheepNudge - 1) % 4][nudgeFrame];
+    }
     const int maxW = std::min(width - 64, 360), maxH = std::min(height - 56, maxW * 3 / 4);
     const int bondOffset = showSelection && SHEEP_STATE.getBondPoints() >= 5 ? std::min(16, (width - maxW) / 2) : 0;
     const int artW = std::min(maxW, maxH * 4 / 3), artH = artW * 3 / 4;
     const int artX = x + (width - artW) / 2 + bondOffset, artY = y + (height - artH) / 2;
-    habitUi::sheep(renderer, artX, artY, artW, artH, pose);
+    const bool rest = !showSelection || SHEEP_STATE.isResting();
+    habitUi::sheep(renderer, artX, artY, artW, artH, pose, 255, sheepScene::mirrored(local, rest, eating), nudgeFrame);
   }
 }
 
@@ -203,7 +219,9 @@ void HabitSheepHomeUi::drawHabitRows(const HabitSheepStore& store, int top, int 
     const int slot = selection >= 1 && selection <= 3 ? selection - 1 : 0;
     const auto* habit = store.findHabit(store.getActiveHabitIds()[slot]);
     char label[100];
-    if (selection == 10)
+    if (selection == 0)
+      snprintf(label, sizeof(label), "%s", tr(STR_SHEEP_HOME_HELP));
+    else if (selection == 10)
       snprintf(label, sizeof(label), "%s", tr(STR_GRASS_HISTORY));
     else if (habit) {
       char progress[40];

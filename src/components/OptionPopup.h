@@ -32,8 +32,13 @@
 class OptionPopup {
  public:
   void setHabitStyle(bool value = true) { habitStyle = value; }
+  void showGames(const char* sheepName, std::function<void(int)> callback) {
+    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_DIFFERENT), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_ORDER)};
+    show(sheepName && *sheepName ? sheepName : tr(STR_SHEEP_GAMES), options, 4, 0, std::move(callback));
+    gameMenu = true;
+  }
   void showInteractions(const char* sheepName, std::function<void(int)> callback) {
-    const char* options[] = {tr(STR_SHEEP_PET), tr(STR_SHEEP_CALL), tr(STR_SHEEP_MEMORY)};
+    const char* options[] = {tr(STR_SHEEP_PET), tr(STR_SHEEP_CALL), tr(STR_SHEEP_PAIRS)};
     show(sheepName && *sheepName ? sheepName : tr(STR_SHEEP_INTERACT), options, 3, 0, std::move(callback));
     iconMenu = true;
   }
@@ -167,14 +172,17 @@ class OptionPopup {
 
   void render(const GfxRenderer& renderer) const {
     if (!active) return;
-    if (iconMenu || minuteMenu) {
-      const int w = renderer.getScreenWidth() - 48;
-      const int h = std::min(minuteMenu ? 390 : 220, renderer.getScreenHeight() - 90);
-      const int x = 24, y = (renderer.getScreenHeight() - h) / 2;
+    if (iconMenu || minuteMenu || gameMenu) {
+      const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      const int w = safe.width - 24;
+      const int h = std::min(minuteMenu ? 390 : gameMenu ? 350 : 220, safe.height - 24);
+      const int x = safe.x + 12, y = safe.y + (safe.height - h) / 2;
       renderer.fillRoundedRect(x, y, w, h, 12, Color::White);
       habitUi::popupFrame(renderer, x, y, w, h);
       const auto shownTitle = renderer.truncatedText(NOTOSANS_14_FONT_ID, title.c_str(), w - 32);
-      renderer.drawCenteredText(NOTOSANS_14_FONT_ID, y + 14, shownTitle.c_str());
+      renderer.drawText(NOTOSANS_14_FONT_ID,
+                        x + (w - renderer.getTextWidth(NOTOSANS_14_FONT_ID, shownTitle.c_str())) / 2, y + 14,
+                        shownTitle.c_str());
       interactions.beginPublishCycle();
       auto target = makeUiTarget(renderer);
       const auto device = target.deviceContext();
@@ -183,19 +191,28 @@ class OptionPopup {
       frame.hit(freeink::ui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(w),
                                   static_cast<int16_t>(h)},
                 ACTION_CHROME, 0, freeink::ui::InputTouch);
-      const int columns = minuteMenu ? 2 : 3, rows = minuteMenu ? 4 : 1, step = (w - 32) / columns;
+      const int columns = minuteMenu || gameMenu ? 2 : 3,
+                rows = minuteMenu ? 4
+                       : gameMenu ? 2
+                                  : 1,
+                step = (w - 32) / columns;
       const int menuTop = 14 + renderer.getLineHeight(NOTOSANS_14_FONT_ID) + 12;
-      const int tile = minuteMenu ? step - 10 : std::min(80, (w - 40) / 3);
-      const int rowH = minuteMenu ? (h - menuTop - 24) / 4 : 80;
+      const int tile = minuteMenu || gameMenu ? step - 10 : std::min(80, (w - 40) / 3);
+      const int rowH = minuteMenu || gameMenu ? (h - menuTop - 24) / rows : 80;
       for (int i = 0; i < columns * rows; ++i) {
         const int px = x + 16 + (i % columns) * step + (step - tile) / 2, py = y + menuTop + (i / columns) * rowH;
-        const int tileH = minuteMenu ? rowH - 8 : tile;
+        const int tileH = minuteMenu || gameMenu ? rowH - 8 : tile;
         habitUi::frame(renderer, px, py, tile, tileH, i == selectedIndex);
         if (minuteMenu)
           renderer.drawText(NOTOSANS_14_FONT_ID,
                             px + (tile - renderer.getTextWidth(NOTOSANS_14_FONT_ID, ownedStrings[i].c_str())) / 2,
                             py + (tileH - renderer.getLineHeight(NOTOSANS_14_FONT_ID)) / 2, ownedStrings[i].c_str());
-        else
+        else if (gameMenu) {
+          habitUi::icon(renderer, i == 0 ? 16 : i == 1 ? 21 : i == 2 ? 3 : 20, px + (tile - 40) / 2, py + 4, 40);
+          const auto text = renderer.truncatedText(SMALL_FONT_ID, ownedStrings[i].c_str(), tile - 8);
+          renderer.drawText(SMALL_FONT_ID, px + (tile - renderer.getTextWidth(SMALL_FONT_ID, text.c_str())) / 2,
+                            py + tileH - renderer.getLineHeight(SMALL_FONT_ID) - 2, text.c_str());
+        } else
           habitUi::interaction(renderer, i, px + (tile - 48) / 2, py + (tile - 48) / 2, 48);
         frame.hit(freeink::ui::Rect{static_cast<int16_t>(px), static_cast<int16_t>(py), static_cast<int16_t>(tile),
                                     static_cast<int16_t>(tileH)},
@@ -372,6 +389,7 @@ class OptionPopup {
     grassBadge = false;
     iconMenu = false;
     minuteMenu = false;
+    gameMenu = false;
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
     selectedIndex = currentIndex >= 0 && currentIndex < count ? currentIndex : 0;
     onSelectCallback = std::move(onSelect);
@@ -383,6 +401,7 @@ class OptionPopup {
   bool habitStyle = false;
   bool iconMenu = false;
   bool minuteMenu = false;
+  bool gameMenu = false;
   bool grassBadge = false;
   uint16_t grassGain = 0;
   uint8_t grassStock = 0;

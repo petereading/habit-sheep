@@ -6,9 +6,11 @@
 class SheepMemoryGame {
  public:
   enum class Result : uint8_t { Ignored, Revealed, Match, Miss, Finished };
-  void reset(uint32_t seed) {
-    for (uint8_t i = 0; i < 8; ++i) cards[i] = i / 2;
-    for (uint8_t i = 7; i > 0; --i) {
+  void reset(uint32_t seed, uint8_t count = 8) {
+    size = count == 6 ? 6 : 8;
+    const uint8_t start = seed % 4;
+    for (uint8_t i = 0; i < size; ++i) cards[i] = (start + i / 2) % 4;
+    for (uint8_t i = size - 1; i > 0; --i) {
       seed ^= seed << 13;
       seed ^= seed >> 17;
       seed ^= seed << 5;
@@ -20,15 +22,16 @@ class SheepMemoryGame {
     matched = 0;
     first = second = 8;
   }
-  bool shown(uint8_t card) const { return card < 8 && ((matched & (1 << card)) || card == first || card == second); }
-  uint8_t value(uint8_t card) const { return card < 8 ? cards[card] : 0; }
-  bool complete() const { return matched == 255; }
+  bool shown(uint8_t card) const { return card < size && ((matched & (1 << card)) || card == first || card == second); }
+  uint8_t value(uint8_t card) const { return card < size ? cards[card] : 0; }
+  bool complete() const { return matched == (1U << size) - 1; }
+  bool isMatched(uint8_t card) const { return card < size && (matched & (1U << card)); }
   bool hasMiss() const { return second < 8; }
   void hideMiss() {
     if (hasMiss()) first = second = 8;
   }
   Result reveal(uint8_t card) {
-    if (card >= 8 || hasMiss() || shown(card) || complete()) return Result::Ignored;
+    if (card >= size || hasMiss() || shown(card) || complete()) return Result::Ignored;
     if (first == 8) {
       first = card;
       return Result::Revealed;
@@ -47,4 +50,5 @@ class SheepMemoryGame {
   uint8_t matched = 0;
   uint8_t first = 8;
   uint8_t second = 8;
+  uint8_t size = 8;
 };

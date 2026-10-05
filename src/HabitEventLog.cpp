@@ -138,6 +138,48 @@ HabitDailyProgress HabitEventLog::progressForToday(const std::string& habitId) {
   return it == cachedProgress.end() ? HabitDailyProgress{} : it->progress;
 }
 
+bool HabitEventLog::progressOnDay(const std::string& habitId, const char* day, HabitDailyProgress& result, char* line,
+                                  const size_t capacity) const {
+  result = {};
+  if (!day || !line || capacity < 2) return false;
+  const std::string path = pathForDay(day);
+  if (!Storage.exists(path.c_str())) return true;
+  HalFile file;
+  if (!Storage.openFileForRead("HABIT", path, file)) return false;
+  size_t used = 0;
+  bool oversized = false;
+  const auto parse = [&] {
+    if (!used || oversized) return;
+    line[used] = '\0';
+    JsonDocument doc;
+    if (deserializeJson(doc, line) || habitId != (doc["habit_id"] | "")) return;
+    const char* type = doc["type"] | "";
+    const uint32_t amount = doc["amount"] | static_cast<uint32_t>(0);
+    if (strcmp(type, "completion") == 0) {
+      result.completed = true;
+      if (result.completionCount < UINT16_MAX) ++result.completionCount;
+    } else if (strcmp(type, "duration") == 0 || strcmp(type, "pomodoro") == 0) {
+      result.durationSeconds =
+          amount > UINT32_MAX - result.durationSeconds ? UINT32_MAX : result.durationSeconds + amount;
+      if (strcmp(type, "pomodoro") == 0 && result.pomodoroSessions < UINT16_MAX) ++result.pomodoroSessions;
+    }
+  };
+  while (file.available()) {
+    const int raw = file.read();
+    if (raw < 0) return false;
+    if (raw == '\n') {
+      parse();
+      used = 0;
+      oversized = false;
+    } else if (used + 1 < capacity && !oversized)
+      line[used++] = static_cast<char>(raw);
+    else
+      oversized = true;
+  }
+  parse();
+  return true;
+}
+
 uint16_t HabitEventLog::completionCountForDay(const std::string& habitId, const std::string& day) const {
   const std::string path = pathForDay(day);
   if (!Storage.exists(path.c_str())) return 0;

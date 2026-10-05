@@ -34,6 +34,7 @@ class HabitSheepHomeUi {
   static Action actionForSelection(int value);
   int selectedAction(MappedInputManager& input) const;
   int longPressedHabit(MappedInputManager& input) const;
+  bool isInteracting() const { return sheepNudge != 0; }
   void renderUi(const HabitSheepStore& store, bool showDock = true, const RecentBook* book = nullptr) const;
   void renderSleepUi(const HabitSheepStore& store) const;
 
@@ -45,6 +46,7 @@ class HabitSheepHomeUi {
   int selection = 0;
   uint8_t sheepNudge = 0;
   unsigned long nudgeStartedMs = 0;
+  uint8_t nudgeFrame = 0;
 
   void drawSheep(int x, int y, int width, int height, bool showSelection = true) const;
   void drawHabitRows(const HabitSheepStore& store, int top, int height, bool passive = false) const;

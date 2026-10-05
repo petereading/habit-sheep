@@ -4,6 +4,15 @@
 #include <ctime>
 
 namespace sheepScene {
+inline bool mirrored(const tm& local, bool rest, bool eating) {
+  uint32_t value = static_cast<uint32_t>(local.tm_year * 366 + local.tm_yday) * 144U;
+  value += local.tm_hour * 6U + (eating ? 0U : local.tm_min / (rest ? 30U : 10U));
+  if (eating) value = value / 6U;
+  value ^= value << 13;
+  value ^= value >> 17;
+  value ^= value << 5;
+  return (value & 1U) != 0;
+}
 inline bool mealVisual(const tm& local) {
   return (local.tm_hour == 8 || local.tm_hour == 13 || local.tm_hour == 19) && local.tm_min < 5;
 }

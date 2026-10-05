@@ -12,6 +12,7 @@
 #include <Memory.h>
 #include <Utf8.h>
 #include <Xtc.h>
+#include <esp_system.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -26,11 +27,13 @@
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
+#include "SheepScene.h"
 #include "SheepStateStore.h"
 #include "activities/habits/GrassHistoryActivity.h"
 #include "activities/habits/HabitCountActivity.h"
 #include "activities/habits/HabitDurationActivity.h"
 #include "activities/habits/SheepMemoryActivity.h"
+#include "activities/habits/SheepPuzzleActivity.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/HabitReward.h"
 #include "components/UITheme.h"
@@ -375,20 +378,8 @@ void HomeActivity::activateHabitSheepSelection() {
         else
           onFileBrowserOpen();
       } else if (!SHEEP_STATE.isForaging()) {
-        habitReplacementPopup.showInteractions(HABIT_SHEEP.getSheepName().c_str(), [this](int selected) {
-          if (selected == 0 || selected == 1) {
-            SHEEP_STATE.recordInteraction();
-            habitSheepUi->nudgeSheep(static_cast<uint8_t>(selected));
-          } else if (selected == 2) {
-            // ActivityManager owns the single screen-lifetime game allocation.
-            auto game = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
-            if (game)
-              activityManager.pushActivity(std::move(game));
-            else
-              LOG_ERR("HABIT", "OOM: memory game");
-          }
-          requestUpdate();
-        });
+        SHEEP_STATE.recordInteraction();
+        habitSheepUi->nudgeSheep(static_cast<uint8_t>(esp_random() % 4));
         requestUpdate();
       }
       break;
@@ -447,6 +438,32 @@ void HomeActivity::activateHabitSheepSelection() {
   }
 }
 
+bool HomeActivity::preventAutoSleep() {
+  if (!habitSheepUi || !HABIT_SHEEP.isEnabled()) return false;
+  tm local{};
+  return habitSheepUi->isInteracting() || (halClock.localTime(local) && SHEEP_STATE.ateCurrentMeal(local));
+}
+
+void HomeActivity::showSheepGames() {
+  habitReplacementPopup.showGames(HABIT_SHEEP.getSheepName().c_str(), [this](int selected) {
+    if (selected == 0) {
+      auto game = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
+      if (game)
+        activityManager.pushActivity(std::move(game));
+      else
+        LOG_ERR("HABIT", "OOM: Pairs");
+    } else {
+      auto game =
+          makeUniqueNoThrow<SheepPuzzleActivity>(renderer, mappedInput, static_cast<SheepPuzzle::Mode>(selected - 1));
+      if (game)
+        activityManager.pushActivity(std::move(game));
+      else
+        LOG_ERR("HABIT", "OOM: sheep puzzle");
+    }
+  });
+  requestUpdate();
+}
+
 void HomeActivity::loopHabitSheepHome() {
   if (!habitSheepUi) return;
   RenderLock lock;
@@ -461,7 +478,9 @@ void HomeActivity::loopHabitSheepHome() {
     }
     requestUpdate();
   }
-  if (SHEEP_STATE.settleDay() || habitClock.changed()) requestUpdate();
+  const bool mealChanged = SHEEP_STATE.settleDay();
+  const bool clockChanged = habitClock.changed();
+  if (mealChanged || clockChanged) requestUpdate();
 
   uint32_t progressStamp = 0;
   for (const auto& id : HABIT_SHEEP.getActiveHabitIds()) {
@@ -485,6 +504,11 @@ void HomeActivity::loopHabitSheepHome() {
   }
 
   const int longPressedSlot = habitSheepUi->longPressedHabit(mappedInput);
+  if (longPressedSlot == 3) {
+    selectorIndex = 0;
+    showSheepGames();
+    return;
+  }
   if (longPressedSlot >= 0) {
     showHabitReplacementPicker(longPressedSlot);
     return;

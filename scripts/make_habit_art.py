@@ -17,52 +17,73 @@ def svg(name, body, width=256, height=192):
         f'viewBox="0 0 {width} {height}">{body}</svg>\n')
 
 
-BODY = 'M62 151C40 158 21 143 29 125C10 114 16 93 33 86C24 66 43 50 64 56C66 34 89 25 108 36C120 16 148 22 154 40C181 29 200 45 194 62C215 61 223 79 207 91L191 125C191 147 166 157 149 146C136 164 112 163 102 151C90 162 73 160 62 151Z'
+BODY = 'M47 141C25 148 12 131 22 115C7 99 17 80 34 79C27 60 46 46 65 52C69 33 92 32 105 43C121 27 142 31 151 47C172 37 191 49 191 66C211 67 215 88 202 99C214 119 199 136 181 134C171 154 149 156 133 143C116 156 98 156 86 145C72 154 54 154 47 141Z'
 
-for i in range(18):
-    asleep = 12 <= i < 16
-    mirror = i in (1, 5, 10, 13, 15)
-    jump = i == 11
-    tilt = [0, 0, -12, 12, 0, 0, -8, 5, -5, 24, -20, -8, 0, 0, 5, -5, 30, 22][i]
-    body_shift = -10 if jump else (8 if asleep else 0)
-    front = '<path d="M71 139v27q8 12 17 0v-27M132 139v27q8 12 17 0v-27" fill="black"/>'
-    if asleep:
-        front = '<ellipse cx="77" cy="155" rx="21" ry="10" fill="black"/><ellipse cx="150" cy="155" rx="21" ry="10" fill="black"/>'
-    elif i in (4, 5):
-        front = '<path d="m71 137-10 29q2 12 12 7l19-32m36-3 12 27q8 9 16 0l-8-30" fill="black"/>'
-    elif i == 6:
-        front = '<path d="m71 137-21 28q1 12 12 8l30-32m37-3 17 28q9 9 16-1l-17-27" fill="black"/>'
-    face = '<path d="M171 65C192 62 224 74 232 100C238 125 211 143 183 137C160 133 153 108 163 88Z" fill="black"/>'
-    eye = '<path d="M205 104q5 8 11 0" stroke="white" fill="none" stroke-width="4" stroke-linecap="round"/>' if asleep or i == 8 else '<circle cx="208" cy="103" r="4" fill="white"/>'
-    if i == 2:
-        eye += '<circle cx="188" cy="103" r="4" fill="white"/>'
-    face += '<path d="M179 75q-30 9-24 35q21 4 28-23Z" fill="black"/>' + eye
-    face += '<path d="M212 122q5 5 9 0" stroke="white" fill="none" stroke-width="3" stroke-linecap="round"/>'
-    marks = ''
-    if i == 7:
-        marks = '<path d="m15 51 9 6m-9 15 9 0m207-35-9 7m13 9-10 2" stroke="black" stroke-width="3"/>'
+
+def character(i, face_color='black', leg_color='black'):
+    rest = 12 <= i < 16
+    eyes = 'white' if face_color == 'black' else 'black'
+    tail = '<path d="M23 92q-17-15-21 0q-5 12 8 17q11 4 17-5" fill="white" stroke="black" stroke-width="2.5"/>'
+    legs = '<path d="M52 130v39q6 9 13 0v-39M79 132v33q6 9 13 0v-33M144 130v39q6 9 13 0v-39M173 126v39q6 9 13 0v-39" fill="%s" stroke="black" stroke-width="2.5"/>' % leg_color
+    if i in (4, 5, 7):
+        legs = '<path d="m55 131-22 30q-2 9 9 9l25-30m12-10 11 30q7 9 15 0l-11-30m49 0-12 32q4 11 14 5l15-30m14-10 23 25q11 5 13-5l-22-29" fill="%s" stroke="black" stroke-width="2.5"/>' % leg_color
+    if rest:
+        legs = '<ellipse cx="55" cy="148" rx="23" ry="9" fill="black"/><ellipse cx="151" cy="148" rx="25" ry="9" fill="black"/>'
+    if i == 14:
+        legs = '<path d="m39 123-30 20q-6 12 8 13l36-19m15 0-30 18q-2 12 13 12l34-17m39-14 25 17q15 3 15-9l-27-18" fill="black"/>'
+    if i == 15:
+        legs = '<path d="m161 135 51 17q16 12-3 17l-60-19m27-20 53 9q18 8 1 17l-58-11" fill="black"/>' + legs
+    if i == 6:
+        legs = '<path d="m150 132 46 21q17 13-4 16l-55-21m-75-13 12 28q8 9 16 0l-14-32m40-10 3 39q8 10 16-1l-3-36" fill="black"/>'
     if i == 8:
-        marks = '<path d="m63 143-19-16 10-5 20 24" stroke="black" stroke-width="5" fill="none"/>'
-    if i in (14, 15):
-        marks = '<path d="M219 40h14l-14 14h14m5-32h10l-10 10h10" stroke="black" stroke-width="2" fill="none"/>'
+        legs = '<path d="M57 127v42q8 9 16 0v-42M91 126v39q8 9 16 0v-39M170 85q25-20 28 1q2 23-22 17M167 114q26-14 28 6q-4 20-28 6" fill="black"/>'
+    face = '<path d="M181 64q-16 15-10 43q5 38 26 40q24 2 27-33q3-37-15-49Z" fill="%s" stroke="black" stroke-width="2.5"/>' % face_color
+    face += '<path d="M179 72q-28 4-33 25q1 16 16 7l24-22M211 72q24 4 33 22q3 17-12 12l-21-22" fill="%s"/>' % face_color
+    closed = rest and i != 12 or i in (6, 8, 18)
+    face += ('<path d="M183 100q5 7 10 0m9 0q5 7 10 0" fill="none" stroke="%s" stroke-width="2.5" stroke-linecap="round"/>' % eyes if closed else '<ellipse cx="187" cy="102" rx="3" ry="4" fill="%s"/><ellipse cx="207" cy="100" rx="3" ry="4" fill="%s"/>' % (eyes, eyes))
+    face += '<path d="M190 126q7 8 14 0" fill="none" stroke="%s" stroke-width="2.5" stroke-linecap="round"/>' % eyes
+    face += '<path d="M175 65q-8-12 4-16q2-12 13-7q8-9 16 0q13-2 13 10q10 8 0 16q-9 7-17 1q-9 7-15 0q-12 5-14-4Z" fill="white" stroke="black" stroke-width="2.5"/>'
+    angle = {1: 8, 2: -15, 3: -25, 5: -8, 9: -90, 10: -55, 11: 20, 13: 20, 14: 45, 15: 15, 16: 60, 17: 10, 18: 15, 19: -15}.get(i, 0)
+    face = '<g transform="rotate(%d 183 93)">%s</g>' % (angle, face)
+    body = '<path d="%s" fill="white" stroke="black" stroke-width="2.5" stroke-linejoin="round"/>' % BODY
+    if i == 9:
+        face = '<g transform="translate(-25 -4)">%s</g>' % face
+    if i == 3:
+        face = '<g transform="translate(0 -8)">%s</g>' % face
+    if i == 6:
+        body = '<g transform="rotate(12 120 100)">%s</g>' % body
+        face = '<g transform="translate(-10 18)">%s</g>' % face
+    if i == 16:
+        face = '<g transform="translate(-5 14)">%s</g>' % face
+    if i == 8:
+        body = '<g transform="rotate(-22 120 100)">%s</g>' % body
+        face = '<g transform="translate(-6 -12)">%s</g>' % face
+    scene = tail + legs + body
+    if i == 8:
+        scene += '<path d="M158 101q20-14 23 2q1 18-18 18m-18-26q-16-15-19 3q-1 15 16 16" fill="black"/>'
+    if i == 19:
+        scene += '<path d="M169 133q-11-18-3-29q8-8 16 1l7 34Z" fill="black"/>'
+    scene += face
+    if i == 7:
+        scene = '<g transform="translate(8 -10) rotate(-12 128 100)">%s</g>' % scene
+    if i == 13:
+        scene = '<g transform="translate(12 18) scale(.92 .85)">%s</g>' % scene
+    if i == 14:
+        scene = '<g transform="rotate(8 128 100)">%s</g>' % scene
+    if i == 16:
+        scene += '<path d="M212 179l-7-15 12 9 4-21 4 21 12-12-5 18m-43 0-7-12 12 6 4-14 4 20" stroke="black" stroke-width="2.5" fill="none"/>'
     if i == 17:
-        marks = '<path d="m224 149 6 3m-9 4 6 4" stroke="black" stroke-width="2"/>'
-    transform = 'translate(256 0) scale(-1 1)' if mirror else ''
-    svg(f'sheep_{i:02}', f'<g transform="{transform}"><g transform="translate(0 {body_shift})">{front}'
-        f'<g transform="rotate({tilt} 171 95)">{face}</g>'
-        f'<path d="{BODY}" fill="white" stroke="black" stroke-width="3" stroke-linejoin="round"/>'
-        f'{marks}</g></g>')
+        scene += '<path d="m210 132 19 9m-18-7 12 16m-12-16 21-1" stroke="black" stroke-width="2"/>'
+    return '<g transform="translate(12 10) scale(.9)">%s</g>' % scene
 
+
+for i in range(20):
+    svg(f'sheep_{i:02}', character(i))
 for variant in range(4):
-    face_color = 'white' if variant & 1 else 'black'
-    eye_color = 'black' if variant & 1 else 'white'
-    leg_color = 'white' if variant & 2 else 'black'
-    legs = f'<path d="M71 139v27q8 12 17 0v-27M132 139v27q8 12 17 0v-27" fill="{leg_color}" stroke="black" stroke-width="3"/>'
-    face = f'<path d="M171 65C192 62 224 74 232 100C238 125 211 143 183 137C160 133 153 108 163 88Z" fill="{face_color}" stroke="black" stroke-width="3"/>'
-    face += f'<circle cx="208" cy="103" r="4" fill="{eye_color}"/><path d="M212 122q5 5 9 0" stroke="{eye_color}" fill="none" stroke-width="3"/>'
-    svg(f'pair_{variant:02}', legs + face + f'<path d="{BODY}" fill="white" stroke="black" stroke-width="3"/>')
+    svg(f'pair_{variant:02}', character(0, 'white' if variant & 1 else 'black',
+                                     'white' if variant & 2 else 'black'))
 
-outline = 'fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"'
+outline = 'fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
 svg('grass', f'<g {outline}><path d="M24 43V8M24 28 10 13M24 35l14-19M12 43 6 27m30 16 7-14"/></g>',48,48)
 # Three independent blades preserve exact one-unit stock changes at small sizes.
 stock_blades = (
@@ -87,7 +108,7 @@ svg('play', f'<g {outline}><path d="M14 12h20q6 0 8 9l3 15q0 7-6 4l-8-7H17l-8 7q
 for path in sorted(ART.glob('*.svg')):
     png = ART / f'{path.stem}.png'
     subprocess.run(['inkscape', str(path), '--export-type=png', '--export-background=white',
-                    '--export-background-opacity=255', f'--export-filename={png}'], check=True, capture_output=True)
+                    '--export-background-opacity=255', '--export-width=384' if path.stem.startswith(('sheep_', 'pair_')) else '--export-width=192', f'--export-filename={png}'], check=True, capture_output=True)
     im = Image.open(png).convert('L').point(lambda x: 255 if x >= 160 else 0).convert('1')
     width, height = im.size
     pixels = im.load()

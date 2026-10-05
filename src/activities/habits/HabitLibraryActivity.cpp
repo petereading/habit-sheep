@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <utility>
 
+#include "HabitHistoryActivity.h"
 #include "HabitIconActivity.h"
 #include "I18n.h"
 #include "activities/util/IntervalSelectionActivity.h"
@@ -362,6 +363,16 @@ void HabitLibraryActivity::confirmDelete(const std::string& habitId) {
   requestUpdate();
 }
 
+void HabitLibraryActivity::showHistory(const std::string& habitId) {
+  const auto* habit = HABIT_SHEEP.findHabit(habitId);
+  if (!habit) return;
+  auto history = makeUniqueNoThrow<HabitHistoryActivity>(renderer, mappedInput, *habit);
+  if (history)
+    activityManager.pushActivity(std::move(history));
+  else
+    LOG_ERR("HABIT", "OOM: habit history");
+}
+
 void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
   if (!habit) return;
@@ -373,8 +384,9 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
                              tr(STR_HABIT_LONG_BREAK),
                              tr(STR_HABIT_FOCUS_CYCLE_LENGTH),
                              "Delete",
-                             tr(STR_HABIT_ICON)};
-    popup.show(habit->name.c_str(), OPTIONS, 7, 0, [this, habitId](const int index) {
+                             tr(STR_HABIT_ICON),
+                             tr(STR_HABIT_HISTORY)};
+    popup.show(habit->name.c_str(), OPTIONS, 8, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -389,11 +401,14 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         confirmDelete(habitId);
       else if (index == 6)
         changeIcon(habitId);
+      else if (index == 7)
+        showHistory(habitId);
     });
   } else if (habit->type == HabitType::Duration) {
-    const char* OPTIONS[] = {"Rename",           tr(STR_HABIT_SESSION_LENGTH), tr(STR_HABIT_AUTO_READING),  "Delete",
-                             tr(STR_HABIT_ICON), tr(STR_HABIT_PERIOD),         tr(STR_HABIT_SESSION_TARGET)};
-    popup.show(habit->name.c_str(), OPTIONS, 7, 0, [this, habitId](const int index) {
+    const char* OPTIONS[] = {
+        "Rename",           tr(STR_HABIT_SESSION_LENGTH), tr(STR_HABIT_AUTO_READING),   "Delete",
+        tr(STR_HABIT_ICON), tr(STR_HABIT_PERIOD),         tr(STR_HABIT_SESSION_TARGET), tr(STR_HABIT_HISTORY)};
+    popup.show(habit->name.c_str(), OPTIONS, 8, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -408,10 +423,13 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         changeCompletionPeriod(habitId);
       else if (index == 6)
         changeCompletionTarget(habitId);
+      else if (index == 7)
+        showHistory(habitId);
     });
   } else {
-    const char* OPTIONS[] = {"Rename", tr(STR_HABIT_PERIOD), tr(STR_HABIT_TARGET_COUNT), "Delete", tr(STR_HABIT_ICON)};
-    popup.show(habit->name.c_str(), OPTIONS, 5, 0, [this, habitId](const int index) {
+    const char* OPTIONS[] = {"Rename", tr(STR_HABIT_PERIOD), tr(STR_HABIT_TARGET_COUNT),
+                             "Delete", tr(STR_HABIT_ICON),   tr(STR_HABIT_HISTORY)};
+    popup.show(habit->name.c_str(), OPTIONS, 6, 0, [this, habitId](const int index) {
       if (index == 0)
         renameHabit(habitId);
       else if (index == 1)
@@ -422,6 +440,8 @@ void HabitLibraryActivity::showEditMenu(const std::string& habitId) {
         confirmDelete(habitId);
       else if (index == 4)
         changeIcon(habitId);
+      else if (index == 5)
+        showHistory(habitId);
     });
   }
   requestUpdate();

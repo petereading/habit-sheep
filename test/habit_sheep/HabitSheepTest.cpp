@@ -6,9 +6,11 @@
 #include <memory>
 
 #include "HabitEventLog.h"
+#include "HabitHistoryMath.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
 #include "SheepMemoryGame.h"
+#include "SheepPuzzle.h"
 #include "SheepScene.h"
 #include "SheepStateStore.h"
 #include "components/HabitClock.h"
@@ -395,6 +397,132 @@ TEST_F(HabitSheepTest, MemoryGameKeepsMissVisibleUntilAcknowledgedAndFinishesFou
   }
   EXPECT_TRUE(game.complete());
   EXPECT_EQ(game.reveal(0), SheepMemoryGame::Result::Ignored);
+}
+
+TEST(SheepPuzzleTest, DifferentAlwaysHasExactlyOneAnswerAndMistakesWaitForConfirmation) {
+  for (uint32_t seed = 0; seed < 100; ++seed) {
+    SheepPuzzle p;
+    p.reset(SheepPuzzle::Mode::Different, seed);
+    int frequencies[4]{};
+    for (uint8_t i = 0; i < 4; ++i) ++frequencies[p.value(i)];
+    uint8_t answer = 0;
+    while (frequencies[p.value(answer)] != 1) ++answer;
+    p.choose((answer + 1) % 4);
+    EXPECT_TRUE(p.hasMistake());
+    p.choose(answer);
+    EXPECT_FALSE(p.complete());
+    EXPECT_FALSE(p.hasMistake());
+    p.choose(answer);
+    EXPECT_TRUE(p.complete());
+  }
+}
+
+TEST(HabitHistoryTest, WeeklyRemaindersCarryWithinWeekAndDailyRemaindersDoNot) {
+  uint32_t carried = 0;
+  EXPECT_EQ(historySessions(1200, 1800, true, true, carried), 0U);
+  EXPECT_EQ(historySessions(1200, 1800, true, false, carried), 1U);
+  EXPECT_EQ(historySessions(1200, 1800, true, false, carried), 1U);
+  EXPECT_EQ(historySessions(1200, 1800, true, true, carried), 0U);
+  EXPECT_EQ(historySessions(1200, 1800, false, false, carried), 0U);
+  EXPECT_EQ(historySessions(1200, 1800, false, false, carried), 0U);
+}
+
+TEST(SheepPuzzleTest, RememberWaitsForUserAndKeepsAllFourPositionsDistinct) {
+  SheepPuzzle p;
+  p.reset(SheepPuzzle::Mode::Remember, 42);
+  bool seen[4]{};
+  uint8_t answer = 0;
+  for (uint8_t i = 0; i < 4; ++i) {
+    EXPECT_FALSE(seen[p.value(i)]);
+    seen[p.value(i)] = true;
+    if (p.value(i) == p.targetValue()) answer = i;
+  }
+  EXPECT_TRUE(p.showing());
+  p.choose(answer);
+  EXPECT_FALSE(p.showing());
+  EXPECT_FALSE(p.complete());
+  p.choose(answer);
+  EXPECT_TRUE(p.complete());
+}
+
+TEST(SheepPuzzleTest, OrderingCanBeSolvedBySelectingTwoPositions) {
+  for (uint32_t seed = 1; seed < 100; ++seed) {
+    SheepPuzzle p;
+    p.reset(SheepPuzzle::Mode::Order, seed);
+    EXPECT_FALSE(p.ordered());
+    for (uint8_t i = 0; i < 4 && !p.complete(); ++i) {
+      if (p.value(i) == i) continue;
+      uint8_t j = 0;
+      while (p.value(j) != i) ++j;
+      p.choose(i);
+      EXPECT_EQ(p.picked(), i);
+      p.choose(j);
+    }
+    EXPECT_TRUE(p.complete());
+    EXPECT_TRUE(p.ordered());
+  }
+}
+
+TEST(SheepMemoryTest, SixHousesHaveThreeDistinctPairsAndRequireAcknowledgedMiss) {
+  SheepMemoryGame game;
+  game.reset(123, 6);
+  int frequencies[4]{};
+  for (uint8_t i = 0; i < 6; ++i) ++frequencies[game.value(i)];
+  int pairs = 0;
+  for (int n : frequencies) {
+    EXPECT_TRUE(n == 0 || n == 2);
+    pairs += n == 2;
+  }
+  EXPECT_EQ(pairs, 3);
+  EXPECT_EQ(game.reveal(6), SheepMemoryGame::Result::Ignored);
+  for (uint8_t v = 0; v < 4; ++v)
+    for (uint8_t i = 0; i < 6; ++i)
+      if (game.value(i) == v) game.reveal(i);
+  EXPECT_TRUE(game.complete());
+  for (uint8_t i = 0; i < 6; ++i) EXPECT_TRUE(game.isMatched(i));
+}
+
+TEST(SheepSceneTest, MirrorDirectionStaysStableDuringEachPoseAndMeal) {
+  tm local{};
+  local.tm_year = 126;
+  local.tm_yday = 277;
+  local.tm_hour = 13;
+  bool both[2]{};
+  for (int slot = 0; slot < 12; ++slot) {
+    local.tm_hour = 10 + slot / 6;
+    local.tm_min = slot % 6 * 10;
+    const bool direction = sheepScene::mirrored(local, false, false);
+    both[direction] = true;
+    for (int minute = 0; minute < 10; ++minute) {
+      local.tm_min = slot % 6 * 10 + minute;
+      EXPECT_EQ(sheepScene::mirrored(local, false, false), direction);
+    }
+  }
+  EXPECT_TRUE(both[0] && both[1]);
+  local.tm_hour = 13;
+  local.tm_min = 0;
+  const bool mealDirection = sheepScene::mirrored(local, false, true);
+  for (int i = 0; i < 5; ++i) {
+    local.tm_min = i;
+    EXPECT_EQ(sheepScene::mirrored(local, false, true), mealDirection);
+  }
+}
+
+TEST_F(HabitSheepTest, HistoryReadsOnlySelectedHabitAndHandlesPartialOrCorruptLines) {
+  Storage.files["/.crosspoint/habit_events/2026-09-30.jsonl"] =
+      "{\"habit_id\":\"other\",\"type\":\"completion\"}\n"
+      "{\"habit_id\":\"duration\",\"type\":\"duration\",\"amount\":600}\n"
+      "corrupt\n"
+      "{\"habit_id\":\"duration\",\"type\":\"pomodoro\",\"amount\":1500}";
+  std::array<char, 512> scratch{};
+  HabitDailyProgress progress;
+  EXPECT_TRUE(HABIT_EVENTS.progressOnDay("duration", "2026-09-30", progress, scratch.data(), scratch.size()));
+  EXPECT_EQ(progress.durationSeconds, 2100U);
+  EXPECT_EQ(progress.pomodoroSessions, 1);
+  EXPECT_EQ(progress.completionCount, 0);
+  EXPECT_TRUE(HABIT_EVENTS.progressOnDay("duration", "2026-09-29", progress, scratch.data(), scratch.size()));
+  EXPECT_EQ(progress.durationSeconds, 0U);
+  EXPECT_FALSE(HABIT_EVENTS.progressOnDay("duration", nullptr, progress, scratch.data(), scratch.size()));
 }
 
 TEST_F(HabitSheepTest, FailedStateSaveRetriesOneMealWithoutDoubleConsumption) {
