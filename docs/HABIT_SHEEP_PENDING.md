@@ -130,6 +130,17 @@ Status: approved direction recorded; implementation and artwork remain pending.
 
 Sheep Crossing is deferred. The small no-scroll random maze and other games remain future ideas, not part of this approved replacement.
 
+## Pending game artwork and maze — agreed 2026-10-06
+
+Status: source inspection completed; artwork correction and game replacement are pending. No firmware changes in this update.
+
+| ID | Agreed change | Acceptance notes |
+| --- | --- | --- |
+| P-040 | Correct the older sheep illustrations still used by games. | Source inspection confirms Pairs and SheepPuzzleActivity pass variants 0–3 to habitUi::sheep; HabitUi.cpp selects the separate pair_00–pair_03 bitmaps, rather than the corrected twenty scene poses. The pair SVGs still use the older manually constructed geometry. Rebuild game variants from the approved sheep proportions/style, retaining distinct face/leg combinations needed for Pairs and Remember sheep. Use the approved sheep style in Lights Out and Maze too. |
+| P-041 | Replace Sheep order with the small random Sheep Maze. | One fully visible board, no scrolling or countdown; target a one-to-two-minute round. Try a 7 × 7 logical-cell board and generate a guaranteed-solvable route to the sheep house. Hardware Previous/Next chooses a legal direction and Confirm moves; touch has large separate direction buttons rather than tiny cell targets. Keep controls clear in all orientations. Final four games: Pairs (matching), Remember sheep (memory), Lights Out (logic), Sheep Maze (navigation). |
+
+For visual liveliness, prefer state changes after player actions (revealed sheep, awake/asleep sheep, changed facing or stepping pose) and a completion pose rather than continuous animation. This is a design direction requiring e-ink checks, not a claim that ghosting is eliminated. Sheep Crossing remains deferred.
+
 ## X3 verification checklist
 
 1. Check unframed habit icons, single-outline focus and double-outline popups. Check battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses. Navigate all slots, grass, sheep and dock. Set each Habits orientation, return from a differently oriented reader and check habit/settings navigation and sleep. Confirm smaller sheep, no ground and frame margin above the dock.
