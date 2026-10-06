@@ -10,7 +10,7 @@ Updated 2026-10-06. The timer/Home-focus batch has an X3 test firmware. The late
 | Dock, left to right | Continue reading, Browse files, Library, OPDS, Transfer, Settings. |
 | Immediate tracker access | Select or tap grass stock on Home to open 14-day grass history. Settings → Habits retains the same entry. |
 | Empty habit slots | Rounded dashed placeholders; focus/tap opens Choose habit. Nine saved habits, three active. |
-| Sheep interactions | Short Confirm/tap on the sheep starts a random three-stage interaction, with two-second keyframes and a final smile/heart held to ten seconds. Long Confirm/long touch opens the named 2×2 game popup. Long presses suppress release/tap. Food accounting takes priority over interaction artwork. |
+| Sheep interactions | Short Confirm/tap on the sheep starts a random three-stage interaction, with one-second keyframes and a final smile/heart held until five seconds (source-only timing update). Long Confirm/long touch opens the named 2×2 game popup. Long presses suppress release/tap. Food accounting takes priority over interaction artwork. |
 | Icons | 24 original monochrome icons, including Reading, Focus, Family, Relationship, Money, Phone and five general choices (Star, Flag, Target, Check, Sun). Device and web settings preserve choices. Older habits derive defaults. |
 | Reading and timed habits | One cumulative total combines device reading, paper-book timing and manual minutes. Large whole-session number, smaller `/ target sessions`, accumulated minutes and session length. Daily/weekly targets are independent of rewards. Session length 1–1440 min and target 1–99 can be configured on device and web. |
 | Manual minutes | 5/10/15/20/30/45/60/Custom grid, cumulative total preview and confirmation. Custom uses the existing interval chooser. |
@@ -160,6 +160,14 @@ Not compiled at the user's request. Last delivered firmware remains `15cd79a8`; 
 
 Earlier Lights out descriptions below/above are historical and superseded by P-044. Test portrait/landscape, buttons/touch, the facing distinction at actual small size and maze wall clearance in the next firmware.
 
+## P-048: shorter interaction timing — source-only, 2026-10-06
+
+Interaction timing is halved: frames 0/1 change after one second each, frame 2 is held for three seconds, and the scene returns after five seconds. Previously these intervals were 2/2/6 seconds, ten in total. No firmware or compiled tests run for this update. Verify actual e-ink response on the next build.
+
+## Agreed release name — pending presentation update
+
+The public name is CrossPoint Sheep. Update README, About, boot presentation and release filenames in the next branding batch. Keep the independent CrossPoint fork attribution; Habits remains the settings feature name. No repository rename, release publication, merge or upstream submission is authorized by this naming decision.
+
 ## Validation for the 2026-10-06 batch
 
 - Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.
@@ -178,7 +186,7 @@ Source evidence: HabitTimer.cpp rollover now covers Pomodoro as well as Duration
 5. Complete daily and weekly count habits several times. Verify date range and Monday/default or a changed boundary. Check positive/full-stock notices.
 6. Finish a Pomodoro, leave the break waiting, then Skip break. Repeat during a running short break. Focus starts immediately; +1 per focus, no break/cycle bonus. Home has no daily denominator; cycle setting means focuses before long break.
 7. Use short-press interaction and long-press Games repeatedly, create/rename/delete habits and open chained confirmations. Play several rounds, return Home and read for at least thirty minutes. If it freezes again, record the last screen/action and capture Serial panic/backtrace, free heap and largest block if available.
-8. Leave Home awake for two hours: twelve ten-minute poses, hearts without Mood, no drawn grass. An interaction response returns to the current pose after ten seconds.
+8. Leave Home awake for two hours: twelve ten-minute poses, hearts without Mood, no drawn grass. An interaction response returns to the current pose after five seconds (next build).
 9. Select Habit Sheep sleep mode before a meal. Check exactly one grass deducted, five-minute eating scene, then rest. Leave asleep across half-hour boundaries and wake manually. Compare overnight battery use with Cover sleep mode; scheduled wakes are X3-specific and require device validation.
 10. With no stock, verify missed meals show rest while hearts remain positive; zero hearts shows the foraging sign. Earn grass to return the sheep. Pause/resume and confirm there are no catch-up meal charges or automatic timer resume.
 

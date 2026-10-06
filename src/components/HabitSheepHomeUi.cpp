@@ -97,14 +97,14 @@ void HabitSheepHomeUi::nudgeSheep(uint8_t action) {
   nudgeFrame = 0;
 }
 bool HabitSheepHomeUi::expireNudge() {
-  if (sheepNudge && millis() - nudgeStartedMs < 10000) {
-    const uint8_t frame = std::min<unsigned long>(2, (millis() - nudgeStartedMs) / 2000);
+  if (sheepNudge && millis() - nudgeStartedMs < 5000) {
+    const uint8_t frame = std::min<unsigned long>(2, (millis() - nudgeStartedMs) / 1000);
     if (frame != nudgeFrame) {
       nudgeFrame = frame;
       return true;
     }
   }
-  if (sheepNudge && millis() - nudgeStartedMs >= 10000) {
+  if (sheepNudge && millis() - nudgeStartedMs >= 5000) {
     sheepNudge = 0;
     return true;
   }
