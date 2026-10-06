@@ -168,6 +168,10 @@ Interaction timing is halved: frames 0/1 change after one second each, frame 2 i
 
 The public name is CrossPoint Sheep. Update README, About, boot presentation and release filenames in the next branding batch. Keep the independent CrossPoint fork attribution; Habits remains the settings feature name. No repository rename, release publication, merge or upstream submission is authorized by this naming decision.
 
+## P-049: daytime rest / nighttime sleep — source-only, 2026-10-06
+
+Use device local time: 07:00–21:59 shows approved open-eyed lying/rest pose 12 on the device sleep screen (and when a missed meal puts Home into rest). 22:00–06:59 rotates closed-eye sleep poses 13–15 at half-hour boundaries. Stable random mirroring remains. Eating takes priority and zero mood still uses the foraging notice. RTC maintenance wake scheduling, food/mood accounting and user-selected sleep screen stay unchanged. Daytime currently has one open-eyed rest pose plus mirrored variations; more daytime rest artwork can be added later. Existing scene regression expectations/boundary cases are updated but not compiled or run, per the source-only batch instruction.
+
 ## Validation for the 2026-10-06 batch
 
 - Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.

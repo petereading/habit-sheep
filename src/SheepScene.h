@@ -20,7 +20,10 @@ inline bool mealVisual(const tm& local) {
 
 inline uint8_t pose(const tm& local, bool sleepScreen, bool resting, bool eating) {
   if (eating && mealVisual(local)) return 16 + (local.tm_min % 2);
-  if (sleepScreen || resting) return 12 + ((local.tm_hour * 2 + local.tm_min / 30) % 4);
+  if (sleepScreen || resting) {
+    if (local.tm_hour >= 7 && local.tm_hour < 22) return 12;
+    return 13 + ((local.tm_hour * 2 + local.tm_min / 30) % 3);
+  }
   return (local.tm_hour * 6 + local.tm_min / 10) % 12;
 }
 

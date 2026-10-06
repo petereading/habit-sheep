@@ -836,8 +836,8 @@ TEST(SheepSceneTest, AwakePosesDoNotRepeatForTwoHoursAndRestHasPriority) {
   for (int minute = 0; minute < 120; minute += 30) {
     local.tm_hour = 10 + minute / 60;
     local.tm_min = minute % 60;
-    EXPECT_EQ(sheepScene::pose(local, true, false, false), 12 + minute / 30);
-    EXPECT_EQ(sheepScene::pose(local, false, true, false), 12 + minute / 30);
+    EXPECT_EQ(sheepScene::pose(local, true, false, false), 12);
+    EXPECT_EQ(sheepScene::pose(local, false, true, false), 12);
   }
   local.tm_hour = 13;
   local.tm_min = 0;
@@ -846,6 +846,19 @@ TEST(SheepSceneTest, AwakePosesDoNotRepeatForTwoHoursAndRestHasPriority) {
   EXPECT_LT(sheepScene::pose(local, true, true, false), 16);
   local.tm_min = 5;
   EXPECT_LT(sheepScene::pose(local, true, false, true), 16);
+  local.tm_hour = 6;
+  local.tm_min = 59;
+  EXPECT_GE(sheepScene::pose(local, true, false, false), 13);
+  local.tm_hour = 7;
+  local.tm_min = 0;
+  EXPECT_EQ(sheepScene::pose(local, true, false, false), 12);
+  local.tm_hour = 21;
+  local.tm_min = 59;
+  EXPECT_EQ(sheepScene::pose(local, true, false, false), 12);
+  local.tm_hour = 22;
+  local.tm_min = 0;
+  EXPECT_GE(sheepScene::pose(local, true, false, false), 13);
+  EXPECT_LT(sheepScene::pose(local, true, false, false), 16);
 }
 
 TEST(SheepSceneTest, SleepWakeTargetsMealAndFiveMinuteReturnWithoutMinutePolling) {
