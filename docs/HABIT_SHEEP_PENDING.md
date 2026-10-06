@@ -110,6 +110,16 @@ Status: recorded only; investigation, fixes and regression tests are pending. No
 | P-034 | An unfinished Pomodoro focus from yesterday carried five minutes into today. | Reproduce and identify whether the carry is in the timer display, today's totals or reward accounting. Check unfinished running/paused focus across local midnight, sleep and restart. Previous-date time must not be incorrectly credited to today's daily progress or rewarded twice. Preserve the separately agreed saved Pomodoro cycle counter; do not confuse it with daily progress. |
 | P-035 | Check Reading and other habits for the same cross-day problem. | Check combined device reading, paper timing and manual minutes, plus custom timed and count habits. Verify date attribution, daily reset and no prior-day daily remainder or duplicate grass credit, including pause/resume and restart. Weekly timed remainder may carry within the configured week only; verify the selected week boundary too. These checks have not yet been performed for this report. |
 
+## Pending timer improvements — 2026-10-06
+
+Status: suggestions recorded for later implementation; no code or artwork change in this update.
+
+| ID | Requested improvement | Acceptance notes |
+| --- | --- | --- |
+| P-036 | Show the sheep reading in Reading timed mode, changing pose every five minutes. | Add reading-themed poses to the Reading timer screen. This is a visual change; preserve cumulative time and grass accounting. |
+| P-037 | Show the sheep thinking in Pomodoro mode, changing pose every five minutes. | Use thinking-themed poses, for example a light bulb above its head or a thought bubble. Preserve focus/break timing and reward rules. |
+| P-038 | Add Skip to long breaks, matching the existing short-break button. | Make Skip available for long breaks through hardware buttons and touch. As with short-break Skip, immediately start the next focus session; skipping a break earns no grass. |
+
 ## X3 verification checklist
 
 1. Check unframed habit icons, single-outline focus and double-outline popups. Check battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses. Navigate all slots, grass, sheep and dock. Set each Habits orientation, return from a differently oriented reader and check habit/settings navigation and sleep. Confirm smaller sheep, no ground and frame margin above the dock.
