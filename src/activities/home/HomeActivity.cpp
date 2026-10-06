@@ -260,6 +260,7 @@ void HomeActivity::onEnter() {
     HABIT_EVENTS.refreshToday();
     SHEEP_STATE.settleDay();
     lastHabitProgressStamp = UINT32_MAX;
+    lastHabitModeRevision = HABIT_SHEEP.getModeRevision();
     selectorIndex = mappedInput.hasTouch() ? 0 : HABIT_SHEEP.homeSelection(hasContinueReading);
     requestUpdate();
     return;
@@ -470,12 +471,12 @@ void HomeActivity::loopHabitSheepHome() {
   if (habitSheepUi->expireNudge()) requestUpdate();
   if (lastHabitModeRevision != HABIT_SHEEP.getModeRevision()) {
     lastHabitModeRevision = HABIT_SHEEP.getModeRevision();
-    selectorIndex = 0;
     if (!HABIT_SHEEP.isEnabled()) {
       loadRecentBooks(1);
       hasContinueReading = !recentBooks.empty();
       loadRecentCovers(std::min(260, static_cast<int>(renderer.getScreenHeight()) - 74 - 52 - 110));
     }
+    selectorIndex = mappedInput.hasTouch() ? 0 : HABIT_SHEEP.homeSelection(hasContinueReading);
     requestUpdate();
   }
   const bool mealChanged = SHEEP_STATE.settleDay();

@@ -145,6 +145,10 @@ For visual liveliness, prefer state changes after player actions (revealed sheep
 
 Settings → Habits → Home default selection offers First habit / Sheep / Continue reading only on hardware without touch. Default is the first enabled habit, or the first empty slot when none is enabled. Continue reading falls back to Browse files when there is no recent book. Paused habit mode goes to the reading dock. Back retains the direct resume-book shortcut. The setting persists in schema 8 without rewriting habits or grass/history. Existing fresh defaults already seed Reading, Pomodoro and an empty third slot; a deliberately cleared saved library stays empty.
 
+## P-043: Home default selection reset — implemented 2026-10-06
+
+The first Home loop treated the uninitialized mode-revision sentinel as a mode change and reset selection to the sheep. Home entry now snapshots the current revision when applying the selected default. A real mode change also reapplies the configured hardware default after resolving recent-book availability; touch behavior remains unchanged. Verify First habit, Sheep and Continue reading on entry, after several idle refreshes and after restart. Paused mode uses the reading dock.
+
 ## Validation for the 2026-10-06 batch
 
 - Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.
