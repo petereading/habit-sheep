@@ -120,6 +120,16 @@ Status: suggestions recorded for later implementation; no code or artwork change
 | P-037 | Show the sheep thinking in Pomodoro mode, changing pose every five minutes. | Use thinking-themed poses, for example a light bulb above its head or a thought bubble. Preserve focus/break timing and reward rules. |
 | P-038 | Add Skip to long breaks, matching the existing short-break button. | Make Skip available for long breaks through hardware buttons and touch. As with short-break Skip, immediately start the next focus session; skipping a break earns no grass. |
 
+## Pending game replacement — agreed 2026-10-06
+
+Status: approved direction recorded; implementation and artwork remain pending.
+
+| ID | Agreed change | Acceptance notes |
+| --- | --- | --- |
+| P-039 | Replace Find different with a sheep-themed Lights Out game: turn off the lights so the sheep can sleep. | Use nine sheep houses in a 3 × 3 grid. Every house visibly contains a sheep: lights on shows an awake sheep with open eyes; lights off shows the sheep resting with closed eyes. Keep sheep visible in both states; use a window/lamp marker as well as the pose to distinguish on/off without color. Follow the approved black face/ears/legs and white wool sheep style. Selecting a house toggles its own light and its orthogonal neighbors, never diagonals. Hardware Previous/Next selects a house and Confirm toggles; touch selects large house tiles directly. Generate solvable non-empty puzzles by toggling from the all-off state. No countdown or food/mood penalty; provide Undo/restart. All-off completion uses a double-outline positive popup, with sleeping sheep visible. Keep Pairs, Remember sheep and Sheep order as the other three games. |
+
+Sheep Crossing is deferred. The small no-scroll random maze and other games remain future ideas, not part of this approved replacement.
+
 ## X3 verification checklist
 
 1. Check unframed habit icons, single-outline focus and double-outline popups. Check battery 100%, grass 0/1/2/3/17/18/20/21 and folded/jump poses. Navigate all slots, grass, sheep and dock. Set each Habits orientation, return from a differently oriented reader and check habit/settings navigation and sleep. Confirm smaller sheep, no ground and frame margin above the dock.
