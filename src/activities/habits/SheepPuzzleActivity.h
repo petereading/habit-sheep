@@ -14,5 +14,10 @@ class SheepPuzzleActivity final : public Activity {
   SheepPuzzle puzzle;
   SheepPuzzle::Mode mode;
   uint8_t selection = 0;
+  uint8_t steps = 0;
+  uint8_t direction = 1;
+  int optionCount() const;
+  bool selectable(int index) const;
+  void moveSelection(int delta);
   void choose();
 };

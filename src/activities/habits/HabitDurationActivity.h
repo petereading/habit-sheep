@@ -22,6 +22,7 @@ class HabitDurationActivity final : public Activity {
   int lastRenderedMinute = -1;
   int lastRenderedPhase = -1;
   bool lastRenderedRunning = false;
+  uint8_t lastSheepPose = 255;
   OptionPopup addMinutesPopup;
   HabitClock habitClock;
 

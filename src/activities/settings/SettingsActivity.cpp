@@ -126,10 +126,12 @@ void SettingsActivity::rebuildSettingsLists() {
   readerSettings.insert(readerSettings.begin() + 1,
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
-  habitSheepSettings.reserve(7);
+  habitSheepSettings.reserve(8);
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_MODE, SettingAction::HabitMode));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_WEEK_START, SettingAction::HabitWeekStart));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_ORIENTATION, SettingAction::HabitOrientation));
+  if (!mappedInput.hasTouch())
+    habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_HOME_FOCUS, SettingAction::HabitHomeFocus));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
@@ -389,6 +391,16 @@ void SettingsActivity::toggleCurrentSetting() {
         requestUpdate();
         break;
       }
+      case SettingAction::HabitHomeFocus: {
+        const StrId options[] = {StrId::STR_HABIT_HOME_FIRST, StrId::STR_HABIT_HOME_SHEEP,
+                                 StrId::STR_HABIT_CONTINUE_READING};
+        optionPopup.show(StrId::STR_HABIT_HOME_FOCUS, options, 3, HABIT_SHEEP.getHomeFocus(), [this](int selected) {
+          if (!HABIT_SHEEP.setHomeFocus(selected)) LOG_ERR("HABIT", "Cannot save Home focus");
+          requestUpdate();
+        });
+        requestUpdate();
+        break;
+      }
       case SettingAction::HabitOrientation: {
         const StrId options[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
                                  StrId::STR_LANDSCAPE_CCW};
@@ -604,6 +616,11 @@ void SettingsActivity::openSleepTimeoutPicker() {
 
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
   if (setting.action == SettingAction::HabitMode) return HABIT_SHEEP.isEnabled() ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  if (setting.action == SettingAction::HabitHomeFocus) {
+    static constexpr StrId options[] = {StrId::STR_HABIT_HOME_FIRST, StrId::STR_HABIT_HOME_SHEEP,
+                                        StrId::STR_HABIT_CONTINUE_READING};
+    return I18N.get(options[HABIT_SHEEP.getHomeFocus()]);
+  }
   if (setting.action == SettingAction::HabitOrientation) {
     static constexpr StrId options[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
                                         StrId::STR_LANDSCAPE_CCW};

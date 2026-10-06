@@ -7,6 +7,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "HabitDayTime.h"
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 
@@ -36,9 +37,9 @@ const HabitTimer::Session* HabitTimer::find(const std::string& id) const {
 
 void HabitTimer::clear(Session& session) { session = Session{}; }
 
-bool HabitTimer::rollDurationDay(Session& session) {
+bool HabitTimer::rollDay(Session& session) {
   const auto* habit = HABIT_SHEEP.findHabit(session.habitId);
-  if (!habit || habit->type != HabitType::Duration) return true;
+  if (!habit) return true;
   struct tm local{};
   if (!halClock.isAvailable() || !halClock.localTime(local)) return true;
   char today[16];
@@ -48,12 +49,16 @@ bool HabitTimer::rollDurationDay(Session& session) {
     return true;
   }
   if (strcmp(today, session.day) == 0) return true;
+  if (habit->type == HabitType::Pomodoro) {
+    // An unfinished phase belongs to its date; completed-cycle progress is independent.
+    session.accumulatedMs = 0;
+    session.startedAtMs = millis();
+    session.running = false;
+    snprintf(session.day, sizeof(session.day), "%s", today);
+    return saveToFile();
+  }
   const uint32_t elapsed = elapsedMs(session);
-  const uint32_t newMs =
-      session.running
-          ? std::min<uint32_t>(elapsed,
-                               static_cast<uint32_t>(local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec) * 1000)
-          : 0;
+  const uint32_t newMs = habitMillisAfterMidnight(elapsed, local, session.running);
   const uint32_t oldSeconds = (elapsed - newMs) / 1000;
   if (oldSeconds &&
       !HABIT_EVENTS.appendDurationSecondsOnDay(session.habitId, oldSeconds, session.day, HabitEventSource::Timer))
@@ -131,7 +136,8 @@ bool HabitTimer::start(const std::string& id) {
 bool HabitTimer::pause(const std::string& id) {
   Session* session = find(id);
   if (!session || !session->running) return false;
-  if (!rollDurationDay(*session)) return false;
+  if (!rollDay(*session)) return false;
+  if (!session->running) return true;
   session->accumulatedMs = elapsedMs(*session);
   session->running = false;
   return saveToFile();
@@ -141,7 +147,7 @@ bool HabitTimer::resume(const std::string& id) {
   if (!HABIT_SHEEP.isEnabled()) return false;
   Session* session = find(id);
   if (!session || session->running || isRunning()) return false;
-  if (!rollDurationDay(*session)) return false;
+  if (!rollDay(*session)) return false;
   session->startedAtMs = millis();
   session->running = true;
   if (saveToFile()) return true;
@@ -152,7 +158,7 @@ bool HabitTimer::resume(const std::string& id) {
 uint32_t HabitTimer::stopAndLog(const std::string& id) {
   Session* session = find(id);
   if (!session) return 0;
-  if (!rollDurationDay(*session)) return 0;
+  if (!rollDay(*session)) return 0;
   const uint32_t seconds = elapsedMs(*session) / 1000;
   if (seconds > 0 && session->phase == Phase::Focus &&
       !HABIT_EVENTS.appendDurationSeconds(id, seconds, HabitEventSource::Timer))
@@ -162,13 +168,14 @@ uint32_t HabitTimer::stopAndLog(const std::string& id) {
   return seconds;
 }
 
-bool HabitTimer::skipShortBreak(const std::string& id) {
+bool HabitTimer::skipBreak(const std::string& id) {
   if (!HABIT_SHEEP.isEnabled()) return false;
   Session* session = find(id);
   const HabitDefinition* habit = HABIT_SHEEP.findHabit(id);
-  if (!session || !habit || habit->type != HabitType::Pomodoro || session->phase != Phase::ShortBreak ||
-      hasOtherRunning(id))
+  if (!session || !habit || habit->type != HabitType::Pomodoro || session->phase == Phase::Focus || hasOtherRunning(id))
     return false;
+  if (!rollDay(*session)) return false;
+  const Phase previousPhase = session->phase;
   const uint32_t previousMs = elapsedMs(*session);
   const bool wasRunning = session->running;
   session->phase = Phase::Focus;
@@ -176,7 +183,7 @@ bool HabitTimer::skipShortBreak(const std::string& id) {
   session->startedAtMs = millis();
   session->running = true;
   if (saveToFile()) return true;
-  session->phase = Phase::ShortBreak;
+  session->phase = previousPhase;
   session->accumulatedMs = previousMs;
   session->startedAtMs = millis();
   session->running = wasRunning;
@@ -193,7 +200,7 @@ void HabitTimer::tick() {
       saveToFile();
       return;
     }
-    if (!rollDurationDay(session)) return;
+    if (!rollDay(session)) return;
     if (!session.running) continue;
     if (habit->type != HabitType::Pomodoro) {
       const uint32_t seconds = elapsedMs(session) / 1000;
@@ -291,7 +298,8 @@ bool HabitTimer::pauseAll() {
   uint32_t previousMs = 0;
   for (auto& session : sessions) {
     if (!session.running) continue;
-    if (!rollDurationDay(session)) return false;
+    if (!rollDay(session)) return false;
+    if (!session.running) continue;
     running = &session;
     previousMs = session.accumulatedMs;
     session.accumulatedMs = elapsedMs(session);

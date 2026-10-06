@@ -33,7 +33,7 @@ class OptionPopup {
  public:
   void setHabitStyle(bool value = true) { habitStyle = value; }
   void showGames(const char* sheepName, std::function<void(int)> callback) {
-    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_DIFFERENT), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_ORDER)};
+    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_LIGHTS), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_MAZE)};
     show(sheepName && *sheepName ? sheepName : tr(STR_SHEEP_GAMES), options, 4, 0, std::move(callback));
     gameMenu = true;
   }
@@ -208,7 +208,7 @@ class OptionPopup {
                             px + (tile - renderer.getTextWidth(NOTOSANS_14_FONT_ID, ownedStrings[i].c_str())) / 2,
                             py + (tileH - renderer.getLineHeight(NOTOSANS_14_FONT_ID)) / 2, ownedStrings[i].c_str());
         else if (gameMenu) {
-          habitUi::icon(renderer, i == 0 ? 16 : i == 1 ? 21 : i == 2 ? 3 : 20, px + (tile - 40) / 2, py + 4, 40);
+          habitUi::icon(renderer, i == 0 ? 16 : i == 1 ? 23 : i == 2 ? 3 : 20, px + (tile - 40) / 2, py + 4, 40);
           const auto text = renderer.truncatedText(SMALL_FONT_ID, ownedStrings[i].c_str(), tile - 8);
           renderer.drawText(SMALL_FONT_ID, px + (tile - renderer.getTextWidth(SMALL_FONT_ID, text.c_str())) / 2,
                             py + tileH - renderer.getLineHeight(SMALL_FONT_ID) - 2, text.c_str());

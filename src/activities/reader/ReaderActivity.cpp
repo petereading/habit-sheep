@@ -14,6 +14,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderActivity.h"
+#include "HabitDayTime.h"
 #include "HabitEventLog.h"
 #include "HabitSheepStore.h"
 #include "ReaderUtils.h"
@@ -140,7 +141,9 @@ void ReaderActivity::recordReadingTime(const bool force) {
     char today[sizeof(readingDay)];
     strftime(today, sizeof(today), "%Y-%m-%d", &local);
     if (*readingDay && strcmp(today, readingDay) != 0) {
-      const uint32_t seconds = (now - readingLastRecordedMs) / 1000;
+      const uint32_t elapsed = now - readingLastRecordedMs;
+      const uint32_t newMs = habitMillisAfterMidnight(elapsed, local);
+      const uint32_t seconds = (elapsed - newMs) / 1000;
       if (seconds > 0) {
         const auto& habits = HABIT_SHEEP.getHabits();
         if (std::any_of(habits.begin(), habits.end(), [&](const auto& habit) {
@@ -149,7 +152,7 @@ void ReaderActivity::recordReadingTime(const bool force) {
             }))
           return;
       }
-      readingLastRecordedMs = now;
+      readingLastRecordedMs = now - newMs;
       snprintf(readingDay, sizeof(readingDay), "%s", today);
     } else if (!*readingDay) {
       snprintf(readingDay, sizeof(readingDay), "%s", today);

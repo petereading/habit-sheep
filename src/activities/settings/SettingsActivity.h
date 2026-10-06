@@ -36,6 +36,7 @@ enum class SettingAction {
   HabitMode,
   HabitWeekStart,
   HabitOrientation,
+  HabitHomeFocus,
   SheepMemory,
 };
 

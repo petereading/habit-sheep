@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <memory>
 
+#include "HabitDayTime.h"
 #include "HabitEventLog.h"
 #include "HabitHistoryMath.h"
 #include "HabitSheepStore.h"
@@ -86,7 +87,7 @@ TEST_F(HabitSheepTest, SkipShortBreakStartsFocusWithoutDuplicateReward) {
   HabitEventLog::RewardNotice notice;
   ASSERT_TRUE(HABIT_EVENTS.takeReward(notice));
   EXPECT_EQ(notice.grass, 1);
-  ASSERT_TRUE(HABIT_TIMER.skipShortBreak("pomodoro"));
+  ASSERT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::Focus);
   EXPECT_TRUE(HABIT_TIMER.isRunning());
   EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 0);
@@ -95,7 +96,9 @@ TEST_F(HabitSheepTest, SkipShortBreakStartsFocusWithoutDuplicateReward) {
   HABIT_TIMER.tick();
   EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 2);
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::LongBreak);
-  EXPECT_FALSE(HABIT_TIMER.skipShortBreak("pomodoro"));
+  EXPECT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
+  EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::Focus);
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 2);
 }
 
 TEST_F(HabitSheepTest, CanSkipRunningShortBreakAndResumeSavedFocusManually) {
@@ -104,7 +107,7 @@ TEST_F(HabitSheepTest, CanSkipRunningShortBreakAndResumeSavedFocusManually) {
   HABIT_TIMER.tick();
   ASSERT_TRUE(HABIT_TIMER.resume("pomodoro"));
   advance(20);
-  ASSERT_TRUE(HABIT_TIMER.skipShortBreak("pomodoro"));
+  ASSERT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
   JsonDocument saved;
   HABIT_TIMER.toJson(saved);
   ASSERT_TRUE(HABIT_TIMER.fromJson(saved));
@@ -121,14 +124,14 @@ TEST_F(HabitSheepTest, SkipFailureRestoresBreakAndBlocksAnotherRunningTimer) {
   ASSERT_TRUE(HABIT_TIMER.resume("pomodoro"));
   advance(10);
   habitTestSaveFailure = true;
-  EXPECT_FALSE(HABIT_TIMER.skipShortBreak("pomodoro"));
+  EXPECT_FALSE(HABIT_TIMER.skipBreak("pomodoro"));
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::ShortBreak);
   EXPECT_TRUE(HABIT_TIMER.isRunning());
   EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 10);
   habitTestSaveFailure = false;
   ASSERT_TRUE(HABIT_TIMER.pause("pomodoro"));
   ASSERT_TRUE(HABIT_TIMER.start("duration"));
-  EXPECT_FALSE(HABIT_TIMER.skipShortBreak("pomodoro"));
+  EXPECT_FALSE(HABIT_TIMER.skipBreak("pomodoro"));
 }
 
 TEST_F(HabitSheepTest, DurationAwardsEachRunningSessionSilentlyBeyondTarget) {
@@ -399,21 +402,24 @@ TEST_F(HabitSheepTest, MemoryGameKeepsMissVisibleUntilAcknowledgedAndFinishesFou
   EXPECT_EQ(game.reveal(0), SheepMemoryGame::Result::Ignored);
 }
 
-TEST(SheepPuzzleTest, DifferentAlwaysHasExactlyOneAnswerAndMistakesWaitForConfirmation) {
-  for (uint32_t seed = 0; seed < 100; ++seed) {
+TEST(SheepPuzzleTest, LightsOutTogglesOrthogonalNeighborsAndSupportsUndo) {
+  EXPECT_EQ(SheepPuzzle::lightMask(4), 0x0BA);
+  EXPECT_EQ(SheepPuzzle::lightMask(0), 0x00B);
+  for (uint32_t seed = 0; seed < 500; ++seed) {
     SheepPuzzle p;
-    p.reset(SheepPuzzle::Mode::Different, seed);
-    int frequencies[4]{};
-    for (uint8_t i = 0; i < 4; ++i) ++frequencies[p.value(i)];
-    uint8_t answer = 0;
-    while (frequencies[p.value(answer)] != 1) ++answer;
-    p.choose((answer + 1) % 4);
-    EXPECT_TRUE(p.hasMistake());
-    p.choose(answer);
-    EXPECT_FALSE(p.complete());
-    EXPECT_FALSE(p.hasMistake());
-    p.choose(answer);
+    p.reset(SheepPuzzle::Mode::LightsOut, seed);
+    EXPECT_NE(p.lightState(), 0);
+    const uint16_t before = p.lightState(), solution = p.solvingPresses();
+    p.choose(0);
+    if (!p.complete()) {
+      p.undo();
+      EXPECT_EQ(p.lightState(), before);
+    }
+    p.reset(SheepPuzzle::Mode::LightsOut, seed);
+    for (uint8_t i = 0; i < 9; ++i)
+      if (solution & (1U << i)) p.choose(i);
     EXPECT_TRUE(p.complete());
+    EXPECT_EQ(p.lightState(), 0);
   }
 }
 
@@ -445,21 +451,47 @@ TEST(SheepPuzzleTest, RememberWaitsForUserAndKeepsAllFourPositionsDistinct) {
   EXPECT_TRUE(p.complete());
 }
 
-TEST(SheepPuzzleTest, OrderingCanBeSolvedBySelectingTwoPositions) {
-  for (uint32_t seed = 1; seed < 100; ++seed) {
+TEST(SheepPuzzleTest, MazeHasReciprocalBoundedWallsAndAPathHomeForEverySeed) {
+  for (uint32_t seed = 0; seed < 500; ++seed) {
     SheepPuzzle p;
-    p.reset(SheepPuzzle::Mode::Order, seed);
-    EXPECT_FALSE(p.ordered());
-    for (uint8_t i = 0; i < 4 && !p.complete(); ++i) {
-      if (p.value(i) == i) continue;
-      uint8_t j = 0;
-      while (p.value(j) != i) ++j;
-      p.choose(i);
-      EXPECT_EQ(p.picked(), i);
-      p.choose(j);
+    p.reset(SheepPuzzle::Mode::Maze, seed);
+    std::array<int, 49> parents;
+    std::array<uint8_t, 49> queue, path;
+    parents.fill(-1);
+    parents[42] = 42;
+    queue[0] = 42;
+    int head = 0, tail = 1;
+    while (head < tail) {
+      const uint8_t at = queue[head++];
+      const auto walls = p.mazeWalls(at);
+      if (at < 7) EXPECT_TRUE(walls & 1);
+      if (at % 7 == 6) EXPECT_TRUE(walls & 2);
+      if (at >= 42) EXPECT_TRUE(walls & 4);
+      if (at % 7 == 0) EXPECT_TRUE(walls & 8);
+      for (uint8_t d = 0; d < 4; ++d)
+        if (!(walls & (1U << d))) {
+          const uint8_t n = SheepPuzzle::neighbor(at, d);
+          ASSERT_LT(n, 49);
+          EXPECT_FALSE(p.mazeWalls(n) & (1U << ((d + 2) % 4)));
+          if (parents[n] < 0) {
+            parents[n] = at;
+            queue[tail++] = n;
+          }
+        }
+    }
+    EXPECT_EQ(tail, 49);
+    int count = 0;
+    for (int at = 6; at != 42; at = parents[at]) path[count++] = at;
+    while (count) {
+      const uint8_t next = path[--count];
+      for (uint8_t d = 0; d < 4; ++d)
+        if (p.canMove(d) && SheepPuzzle::neighbor(p.mazePosition(), d) == next) {
+          p.choose(d);
+          break;
+        }
+      EXPECT_EQ(p.mazePosition(), next);
     }
     EXPECT_TRUE(p.complete());
-    EXPECT_TRUE(p.ordered());
   }
 }
 
@@ -597,7 +629,7 @@ TEST_F(HabitSheepTest, PomodoroCycleSurvivesMidnightAndRestartWithoutDailyGoalOr
   ASSERT_TRUE(HABIT_TIMER.fromJson(timer));
   EXPECT_FALSE(HABIT_TIMER.isRunning());
   EXPECT_EQ(HABIT_TIMER.focusesUntilLongBreak("pomodoro"), 1);
-  ASSERT_TRUE(HABIT_TIMER.skipShortBreak("pomodoro"));
+  ASSERT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
   advance(60);
   HABIT_TIMER.tick();
   EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::LongBreak);
@@ -858,4 +890,166 @@ TEST(PopupCallbackTest, ReplacingCallbackKeepsExecutingCaptureAliveAndPreservesN
   EXPECT_FALSE(slot);
   invokePopupChoice(slot, 12);
   EXPECT_EQ(second, 11);
+}
+
+TEST_F(HabitSheepTest, UnfinishedFocusResetsAtMidnightButCompletedCycleSurvives) {
+  ASSERT_TRUE(HABIT_TIMER.start("pomodoro"));
+  advance(60);
+  HABIT_TIMER.tick();
+  ASSERT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
+  advance(30);
+  ASSERT_TRUE(HABIT_TIMER.pause("pomodoro"));
+  date(2);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 0);
+  EXPECT_FALSE(HABIT_TIMER.isRunning());
+  EXPECT_EQ(HABIT_TIMER.focusesUntilLongBreak("pomodoro"), 1);
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 0);
+  ASSERT_TRUE(HABIT_TIMER.resume("pomodoro"));
+  advance(30);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 0);
+  advance(30);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 1);
+  EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::LongBreak);
+}
+TEST_F(HabitSheepTest, SavedFiveMinuteFocusCannotResumeNextDayOrAwardOldTime) {
+  auto habit = *HABIT_SHEEP.findHabit("pomodoro");
+  habit.targetMinutes = 25;
+  ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+  ASSERT_TRUE(HABIT_TIMER.start("pomodoro"));
+  advance(300);
+  ASSERT_TRUE(HABIT_TIMER.pauseAll());
+  JsonDocument saved;
+  HABIT_TIMER.toJson(saved);
+  date(2);
+  ASSERT_TRUE(HABIT_TIMER.fromJson(saved));
+  ASSERT_TRUE(HABIT_TIMER.resume("pomodoro"));
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 0);
+  advance(1200);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 0);
+  advance(300);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 1);
+}
+TEST_F(HabitSheepTest, RunningFocusStopsAtMidnightAndWaitsForManualStart) {
+  ASSERT_TRUE(HABIT_TIMER.start("pomodoro"));
+  advance(30);
+  date(2);
+  HABIT_TIMER.tick();
+  EXPECT_FALSE(HABIT_TIMER.isRunning());
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 0);
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("pomodoro").pomodoroSessions, 0);
+}
+TEST_F(HabitSheepTest, LongBreakSkipHandlesWaitingRunningAndFailedSave) {
+  ASSERT_TRUE(HABIT_TIMER.start("pomodoro"));
+  advance(60);
+  HABIT_TIMER.tick();
+  ASSERT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
+  advance(60);
+  HABIT_TIMER.tick();
+  ASSERT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::LongBreak);
+  ASSERT_TRUE(HABIT_TIMER.resume("pomodoro"));
+  advance(30);
+  habitTestSaveFailure = true;
+  EXPECT_FALSE(HABIT_TIMER.skipBreak("pomodoro"));
+  EXPECT_EQ(HABIT_TIMER.phaseFor("pomodoro"), HabitTimer::Phase::LongBreak);
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 30);
+  EXPECT_TRUE(HABIT_TIMER.isRunning());
+  habitTestSaveFailure = false;
+  ASSERT_TRUE(HABIT_TIMER.skipBreak("pomodoro"));
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 0);
+  EXPECT_EQ(HABIT_TIMER.focusesUntilLongBreak("pomodoro"), 2);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 2);
+}
+TEST_F(HabitSheepTest, SavedPausedReadingStaysOnOriginalDateAcrossRestart) {
+  auto habit = *HABIT_SHEEP.findHabit("duration");
+  habit.readingIntegration = true;
+  ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+  ASSERT_TRUE(HABIT_TIMER.start("duration"));
+  advance(45);
+  ASSERT_TRUE(HABIT_TIMER.pauseAll());
+  JsonDocument saved;
+  HABIT_TIMER.toJson(saved);
+  date(2);
+  ASSERT_TRUE(HABIT_TIMER.fromJson(saved));
+  HABIT_TIMER.tick();
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("duration"), 0);
+  HabitDailyProgress original;
+  char line[512];
+  ASSERT_TRUE(HABIT_EVENTS.progressOnDay("duration", "2026-10-01", original, line, sizeof(line)));
+  EXPECT_EQ(original.durationSeconds, 45);
+  ASSERT_TRUE(HABIT_TIMER.resume("duration"));
+  advance(15);
+  HABIT_TIMER.tick();
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261002).earned, 0);
+  ASSERT_TRUE(HABIT_EVENTS.appendDurationSeconds("duration", 15, HabitEventSource::Manual));
+  ASSERT_TRUE(HABIT_EVENTS.appendDurationSeconds("duration", 15, HabitEventSource::Reader));
+  HABIT_TIMER.stopAndLog("duration");
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("duration").durationSeconds, 45);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261002).earned, 0);
+}
+TEST_F(HabitSheepTest, CountsResetAtTheirDailyAndChosenWeeklyBoundaries) {
+  ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
+  date(2);
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("completion").completionCount, 0);
+  auto habit = *HABIT_SHEEP.findHabit("completion");
+  habit.period = HabitPeriod::Weekly;
+  ASSERT_TRUE(HABIT_SHEEP.upsertHabit(habit));
+  ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
+  date(4);
+  EXPECT_EQ(HABIT_EVENTS.completionCountForWeek(habit.id), 2);
+  date(5);
+  EXPECT_EQ(HABIT_EVENTS.completionCountForWeek(habit.id), 0);
+}
+TEST_F(HabitSheepTest, HomeFocusPersistsAndFallsBackWithoutOverwritingHabits) {
+  EXPECT_EQ(HABIT_SHEEP.homeSelection(true), 1);
+  for (uint8_t value = 0; value < 3; ++value) {
+    ASSERT_TRUE(HABIT_SHEEP.setHomeFocus(value));
+    JsonDocument saved;
+    HABIT_SHEEP.toJson(saved);
+    ASSERT_TRUE(HABIT_SHEEP.fromJson(saved));
+    EXPECT_EQ(HABIT_SHEEP.getHomeFocus(), value);
+  }
+  EXPECT_EQ(HABIT_SHEEP.homeSelection(true), 4);
+  EXPECT_EQ(HABIT_SHEEP.homeSelection(false), 5);
+  EXPECT_FALSE(HABIT_SHEEP.setHomeFocus(3));
+  habitTestSaveFailure = true;
+  EXPECT_FALSE(HABIT_SHEEP.setHomeFocus(0));
+  EXPECT_EQ(HABIT_SHEEP.getHomeFocus(), 2);
+}
+TEST(SheepSceneTest, TimerPoseChangesAtFiveMinuteBoundariesOnly) {
+  tm t{};
+  for (int minute = 0; minute < 15; ++minute) {
+    t.tm_min = minute;
+    EXPECT_EQ(sheepScene::timerPose(t), minute / 5);
+  }
+}
+
+TEST(HabitDayTimeTest, ReaderAndPaperTimerSplitOnlyActuallyElapsedTimeAtMidnight) {
+  tm local{};
+  local.tm_sec = 5;
+  EXPECT_EQ(habitMillisAfterMidnight(20000, local), 5000U);
+  EXPECT_EQ(habitMillisAfterMidnight(3000, local), 3000U);
+  EXPECT_EQ(habitMillisAfterMidnight(20000, local, false), 0U);
+  local.tm_hour = 12;
+  EXPECT_EQ(habitMillisAfterMidnight(20000, local), 20000U);
+}
+
+TEST_F(HabitSheepTest, FreshDefaultsAreReadingFocusAndEmptyButSavedEmptyLibraryStaysEmpty) {
+  JsonDocument fresh;
+  ASSERT_TRUE(HABIT_SHEEP.fromJson(fresh));
+  ASSERT_EQ(HABIT_SHEEP.getHabits().size(), 2);
+  EXPECT_EQ(HABIT_SHEEP.getActiveHabitIds()[0], "reading");
+  EXPECT_EQ(HABIT_SHEEP.getActiveHabitIds()[1], "pomodoro");
+  EXPECT_TRUE(HABIT_SHEEP.getActiveHabitIds()[2].empty());
+  EXPECT_TRUE(HABIT_SHEEP.findHabit("reading")->readingIntegration);
+  EXPECT_EQ(HABIT_SHEEP.homeSelection(true), 1);
+  JsonDocument cleared;
+  cleared["schema"] = 8;
+  ASSERT_TRUE(HABIT_SHEEP.fromJson(cleared));
+  EXPECT_TRUE(HABIT_SHEEP.getHabits().empty());
+  EXPECT_EQ(HABIT_SHEEP.homeSelection(true), 1);
 }

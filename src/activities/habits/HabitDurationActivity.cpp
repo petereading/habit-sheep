@@ -15,6 +15,7 @@
 #include "HabitTimer.h"
 #include "I18n.h"
 #include "RecentBooksStore.h"
+#include "SheepScene.h"
 #include "activities/ActivityManager.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -25,6 +26,10 @@
 
 namespace {
 constexpr int SIDE_PAD = 24;
+uint8_t timerPose() {
+  tm local{};
+  return halClock.localTime(local) ? sheepScene::timerPose(local) : (millis() / 300000U) % 3;
+}
 
 struct TimerLayout {
   int phaseY;
@@ -71,6 +76,7 @@ void HabitDurationActivity::onEnter() {
   Activity::onEnter();
   selection = 0;
   lastRenderedMinute = -1;
+  HABIT_TIMER.tick();
   requestUpdate();
 }
 
@@ -107,7 +113,7 @@ HabitDurationActivity::ActionLabels HabitDurationActivity::actionLabels() const 
       labels.items[labels.count++] = tr(STR_HABIT_START_FOCUS);
     else
       labels.items[labels.count++] = tr(STR_HABIT_RESUME_TIMER);
-    if (pomodoro && phase == HabitTimer::Phase::ShortBreak && !HABIT_TIMER.hasOtherRunning(habitId))
+    if (pomodoro && phase != HabitTimer::Phase::Focus && !HABIT_TIMER.hasOtherRunning(habitId))
       labels.items[labels.count++] = tr(STR_HABIT_SKIP_SHORT_BREAK);
     labels.items[labels.count++] = pomodoro ? tr(STR_HABIT_END_SESSION) : tr(STR_HABIT_STOP_LOG);
   } else if (HABIT_TIMER.isRunning()) {
@@ -204,10 +210,10 @@ void HabitDurationActivity::activate() {
       return;
     }
     const HabitDefinition* habit = HABIT_SHEEP.findHabit(habitId);
-    if (habit && habit->type == HabitType::Pomodoro && HABIT_TIMER.phaseFor(habitId) == HabitTimer::Phase::ShortBreak &&
+    if (habit && habit->type == HabitType::Pomodoro && HABIT_TIMER.phaseFor(habitId) != HabitTimer::Phase::Focus &&
         !HABIT_TIMER.hasOtherRunning(habitId)) {
       if (selection == index++) {
-        HABIT_TIMER.skipShortBreak(habitId);
+        HABIT_TIMER.skipBreak(habitId);
         selection = 0;
         requestUpdate();
         return;
@@ -245,6 +251,11 @@ void HabitDurationActivity::activate() {
 void HabitDurationActivity::loop() {
   RenderLock lock;
   if (habitClock.changed()) requestUpdate();
+  const uint8_t pose = timerPose();
+  if (pose != lastSheepPose) {
+    lastSheepPose = pose;
+    requestUpdate();
+  }
   if (addMinutesPopup.isActive()) {
     addMinutesPopup.handleInput(mappedInput, [this] { requestUpdate(); });
     return;
@@ -387,8 +398,19 @@ void HabitDurationActivity::render(RenderLock&&) {
   const int barX = safe.x + SIDE_PAD;
   const int barW = screenW - SIDE_PAD * 2;
   const int sheepTop = layout.barY + 22, sheepH = layout.actionsY - sheepTop - 8;
-  if (sheepH > 55)
-    habitUi::sheep(renderer, center - 85, sheepTop, 170, sheepH, HABIT_TIMER.isRunningFor(habitId) ? 0 : 12);
+  const bool themed =
+      habit->readingIntegration || (pomodoro && HABIT_TIMER.phaseFor(habitId) == HabitTimer::Phase::Focus);
+  const bool compact = renderer.getScreenHeight() <= 600;
+  const int sx = compact ? safe.x + safe.width - 112 : center - 85;
+  const int sy = compact ? headerBottom + 4 : sheepTop;
+  const int sw = compact ? 88 : 170, sh = compact ? 66 : sheepH;
+  if (sh > 55) {
+    const uint8_t pose = timerPose();
+    if (themed)
+      habitUi::timerSheep(renderer, sx, sy, sw, sh, pomodoro, pose);
+    else
+      habitUi::sheep(renderer, sx, sy, sw, sh, 12 + pose);
+  }
 
   const auto labels = actionLabels();
   for (int i = 0; i < labels.count; ++i) {

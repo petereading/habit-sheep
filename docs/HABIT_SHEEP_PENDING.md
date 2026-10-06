@@ -1,6 +1,6 @@
 # Habit Sheep — implemented screens and X3 verification
 
-Updated 2026-10-06. The second artwork/game/history batch is implemented for X3 testing. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
+Updated 2026-10-06. The 2026-10-06 timer, Home focus, artwork and four-game batch is implemented for X3 testing. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
 
 ## Current implementation
 
@@ -17,7 +17,7 @@ Updated 2026-10-06. The second artwork/game/history batch is implemented for X3 
 | Daily/weekly counts | Dedicated progress screen, week date range and confirmed Log one action. Week starts on any chosen weekday, default Monday. |
 | Pomodoro | Tool without a daily target. Home shows today's completed sessions; timer shows focuses until long break and phase progress. Default four focuses controls long breaks, not a reward goal. Manual breaks; Skip short break immediately starts focus. Unified `min`. |
 | Completion | Count/focus completions show double-line positive notices and actual gain or full-stock/save-failure notice. Reading/timed sessions award silently. |
-| Games | Pairs has six houses/three pairs: selecting opens a door, a miss stays visible until acknowledged, and matched houses remain open with a check. Find different, Remember sheep and Sheep order fill the other three 2×2 menu entries. Previous/Next/Confirm/Back and direct touch work throughout. Remember waits for user confirmation to hide; order swaps two selected sheep. No timed reflexes, dragging or food rewards. |
+| Games | Pairs has six houses/three pairs: selecting opens a door, a miss stays visible until acknowledged, and matched houses remain open with a check. Lights out, Remember sheep and Sheep Maze fill the other three 2×2 menu entries. Previous/Next/Confirm/Back and direct touch work throughout. Remember waits for user confirmation to hide; Lights out toggles a house and its orthogonal neighbors, with Undo/restart; the random 7 × 7 maze fits one screen and has separate direction controls. No timed reflexes, dragging or food rewards. |
 | Grass presentation | `Grass 21 / 21` in text settings; seven right-aligned three-blade symbols on Home and sleep (one blade per unit). Exact numerical stock in history. No decorative grass or ground line in sheep scenes. |
 | Awake poses | Twelve poses, ten-minute intervals, no repeat within two hours. Missed meals override with rest; only zero mood shows the foraging sign. |
 | Sleep selection | Display → Sleep Screen → Habit Sheep. No separate Sleep sheep scene setting. Date, battery without percentage, hearts below date, sheep, three passive habit progress icons. |
@@ -101,18 +101,18 @@ The e7b4d83 sheep was manually reconstructed geometry and departed from the appr
 
 Both grass and individual habit history show their two on-screen paging buttons only when MappedInputManager reports touch capability. The hardware-only UI keeps CrossPoint's mapped bottom hints; touch themes already suppress those hints. Habit history uses the same single-outline touch buttons and tap rectangles as grass history. X3 checks: only one Newer/Older control set; touch check: visible buttons still page correctly.
 
-## Pending cross-day bug checks — X3 report 2026-10-06
+## Cross-day corrections — X3 report 2026-10-06, implemented
 
-Status: recorded only; investigation, fixes and regression tests are pending. No code change is included with this report.
+Status: source investigation and automated regression checks completed; X3 overnight testing remains open. The old Pomodoro rollover helper returned early for every non-Duration habit. It now resets unfinished Pomodoro phase time on date change and stops it until manually started, preserving completed-cycle progress.
 
 | ID | Report / pending check | Acceptance notes |
 | --- | --- | --- |
 | P-034 | An unfinished Pomodoro focus from yesterday carried five minutes into today. | Reproduce and identify whether the carry is in the timer display, today's totals or reward accounting. Check unfinished running/paused focus across local midnight, sleep and restart. Previous-date time must not be incorrectly credited to today's daily progress or rewarded twice. Preserve the separately agreed saved Pomodoro cycle counter; do not confuse it with daily progress. |
-| P-035 | Check Reading and other habits for the same cross-day problem. | Check combined device reading, paper timing and manual minutes, plus custom timed and count habits. Verify date attribution, daily reset and no prior-day daily remainder or duplicate grass credit, including pause/resume and restart. Weekly timed remainder may carry within the configured week only; verify the selected week boundary too. These checks have not yet been performed for this report. |
+| P-035 | Check Reading and other habits for the same cross-day problem. | Check combined device reading, paper timing and manual minutes, plus custom timed and count habits. Verify date attribution, daily reset and no prior-day daily remainder or duplicate grass credit, including pause/resume and restart. Weekly timed remainder may carry within the configured week only; verify the selected week boundary too. Regression tests now cover these cases; shared midnight splitting also ensures newly elapsed device-reading seconds stay on the new date. Hardware verification remains open. |
 
-## Pending timer improvements — 2026-10-06
+## Timer improvements — 2026-10-06, implemented
 
-Status: suggestions recorded for later implementation; no code or artwork change in this update.
+Status: implemented. Reading and focus each have three themed illustrations derived from the approved sheep sources, rotating at five-minute boundaries. Both long and short breaks expose Skip, which immediately starts focus without food.
 
 | ID | Requested improvement | Acceptance notes |
 | --- | --- | --- |
@@ -120,9 +120,9 @@ Status: suggestions recorded for later implementation; no code or artwork change
 | P-037 | Show the sheep thinking in Pomodoro mode, changing pose every five minutes. | Use thinking-themed poses, for example a light bulb above its head or a thought bubble. Preserve focus/break timing and reward rules. |
 | P-038 | Add Skip to long breaks, matching the existing short-break button. | Make Skip available for long breaks through hardware buttons and touch. As with short-break Skip, immediately start the next focus session; skipping a break earns no grass. |
 
-## Pending game replacement — agreed 2026-10-06
+## Lights out replacement — agreed 2026-10-06, implemented
 
-Status: approved direction recorded; implementation and artwork remain pending.
+Status: implemented. Awake/sleeping sheep remain visible in every house; the lamp marker also distinguishes state. Random puzzles are generated from solved states and guaranteed solvable; 500 seeds are regression-tested.
 
 | ID | Agreed change | Acceptance notes |
 | --- | --- | --- |
@@ -130,9 +130,9 @@ Status: approved direction recorded; implementation and artwork remain pending.
 
 Sheep Crossing is deferred. The small no-scroll random maze and other games remain future ideas, not part of this approved replacement.
 
-## Pending game artwork and maze — agreed 2026-10-06
+## Game artwork and maze — agreed 2026-10-06, implemented
 
-Status: source inspection completed; artwork correction and game replacement are pending. No firmware changes in this update.
+Status: implemented. All four game palettes derive from the approved sheep_00 contour and retain the silhouette with black/white face and leg variants. No old manually reconstructed character is generated. Lights out and Maze use the approved scene poses. Maze uses an iterative, fixed-array generator (no recursive stack or heap); all 49 cells are reachable and boundaries/walls are reciprocal in 500 tested seeds.
 
 | ID | Agreed change | Acceptance notes |
 | --- | --- | --- |
@@ -140,6 +140,19 @@ Status: source inspection completed; artwork correction and game replacement are
 | P-041 | Replace Sheep order with the small random Sheep Maze. | One fully visible board, no scrolling or countdown; target a one-to-two-minute round. Try a 7 × 7 logical-cell board and generate a guaranteed-solvable route to the sheep house. Hardware Previous/Next chooses a legal direction and Confirm moves; touch has large separate direction buttons rather than tiny cell targets. Keep controls clear in all orientations. Final four games: Pairs (matching), Remember sheep (memory), Lights Out (logic), Sheep Maze (navigation). |
 
 For visual liveliness, prefer state changes after player actions (revealed sheep, awake/asleep sheep, changed facing or stepping pose) and a completion pose rather than continuous animation. This is a design direction requiring e-ink checks, not a claim that ghosting is eliminated. Sheep Crossing remains deferred.
+
+## P-042: physical-button Home default — implemented 2026-10-06
+
+Settings → Habits → Home default selection offers First habit / Sheep / Continue reading only on hardware without touch. Default is the first enabled habit, or the first empty slot when none is enabled. Continue reading falls back to Browse files when there is no recent book. Paused habit mode goes to the reading dock. Back retains the direct resume-book shortcut. The setting persists in schema 8 without rewriting habits or grass/history. Existing fresh defaults already seed Reading, Pomodoro and an empty third slot; a deliberately cleared saved library stays empty.
+
+## Validation for the 2026-10-06 batch
+
+- Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.
+- Native game drawing code compiled against host renderer/input adapters and checked for bounds in 64 panel/orientation/input cases. Timer/count/history layout geometry was checked in 144 cases. These previews and checks do not substitute for X3/touch-device tests.
+- New game state occupies fixed fields on the existing screen-lifetime activity; the 49-byte generation traversal stack is bounded. New timer/game illustrations remain packed flash PBMs; no additional framebuffer or runtime bitmap buffer is allocated.
+- Existing P-012 freeze report, physical e-ink residual images, touch usability and overnight battery/RTC behavior remain hardware checks. No unverified freeze cure or absence of ghosting is claimed.
+
+Source evidence: HabitTimer.cpp rollover now covers Pomodoro as well as Duration; HabitDayTime.h is shared with ReaderActivity.cpp for midnight fragments. HabitSheepStore.cpp persists/resolves Home focus, SettingsActivity.cpp hides the chooser on touch hardware, and HomeActivity.cpp applies it. SheepPuzzle.h generates both new puzzles; SheepPuzzleActivity.cpp shares drawing/tap geometry and skips blocked physical direction choices. HabitUi.cpp uses the corrected palette and themed timer arrays.
 
 ## X3 verification checklist
 
@@ -154,8 +167,12 @@ For visual liveliness, prefer state changes after player actions (revealed sheep
 9. Select Habit Sheep sleep mode before a meal. Check exactly one grass deducted, five-minute eating scene, then rest. Leave asleep across half-hour boundaries and wake manually. Compare overnight battery use with Cover sleep mode; scheduled wakes are X3-specific and require device validation.
 10. With no stock, verify missed meals show rest while hearts remain positive; zero hearts shows the foraging sign. Earn grass to return the sheep. Pause/resume and confirm there are no catch-up meal charges or automatic timer resume.
 
-11. Play Pairs (six houses), Find different, Remember sheep and Sheep order using buttons. Confirm a wrong answer stays visible until acknowledged. Repeat by touch where available. Confirm long-press does not also trigger short-press interaction.
+11. Play Pairs (six houses), Lights out, Remember sheep and Sheep Maze using buttons. Confirm a wrong answer stays visible until acknowledged. Repeat by touch where available. Confirm long-press does not also trigger short-press interaction.
 12. Open each habit’s History / statistics, check fourteen dates against known reading/count/focus records and test a weekly remainder crossing the first displayed date.
+
+13. At midnight, verify an unfinished focus resets to zero and waits for Start focus while completed-cycle progress remains. Repeat after sleep/restart. Combine device reading, paper timing and manual minutes across daily/weekly boundaries. Skip a waiting and running long break; no food is awarded for Skip.
+14. Set each physical Home default, return Home and restart. Verify Continue reading fallback without a book and First habit with an empty library. Touch hardware should not show this setting.
+15. Open Reading/focus timer screens and leave them for fifteen minutes: three themed five-minute poses, no control overlap in portrait or landscape. Test the corrected game palettes at their actual small size.
 
 ## Engineering and validation
 

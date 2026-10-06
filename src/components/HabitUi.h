@@ -14,6 +14,7 @@ void icon(const GfxRenderer& renderer, uint8_t icon, int x, int y, int size);
 void sheep(const GfxRenderer& renderer, int x, int y, int width, int height, uint8_t pose, uint8_t variant = 255,
            bool mirrored = false, uint8_t effectStep = 2);
 void grass(const GfxRenderer& renderer, int x, int y, int size);
+void timerSheep(const GfxRenderer& renderer, int x, int y, int width, int height, bool thinking, uint8_t pose);
 void grassStock(const GfxRenderer& renderer, int right, int y, int size, uint8_t stock);
 void hearts(const GfxRenderer& renderer, int x, int y, int size, uint8_t mood);
 void interaction(const GfxRenderer& renderer, int action, int x, int y, int size);

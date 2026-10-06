@@ -260,7 +260,7 @@ void HomeActivity::onEnter() {
     HABIT_EVENTS.refreshToday();
     SHEEP_STATE.settleDay();
     lastHabitProgressStamp = UINT32_MAX;
-    selectorIndex = 0;
+    selectorIndex = mappedInput.hasTouch() ? 0 : HABIT_SHEEP.homeSelection(hasContinueReading);
     requestUpdate();
     return;
   }

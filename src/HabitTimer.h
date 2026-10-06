@@ -19,7 +19,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
   bool pause(const std::string& habitId);
   bool pauseAll();
   bool resume(const std::string& habitId);
-  bool skipShortBreak(const std::string& habitId);
+  bool skipBreak(const std::string& habitId);
   uint32_t stopAndLog(const std::string& habitId);
   void tick();
 
@@ -51,7 +51,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
   const Session* find(const std::string& id) const;
   static int64_t currentEpoch();
   static uint32_t elapsedMs(const Session& session);
-  bool rollDurationDay(Session& session);
+  bool rollDay(Session& session);
   void clear(Session& session);
 };
 

@@ -77,10 +77,7 @@ def character(i, face_color='black', leg_color='black'):
     return '<g transform="translate(12 10) scale(.9)">%s</g>' % scene
 
 
-# Approved sheep SVG contours are source assets; do not redraw them here.
-for variant in range(4):
-    svg(f'pair_{variant:02}', character(0, 'white' if variant & 1 else 'black',
-                                     'white' if variant & 2 else 'black'))
+# Approved sheep, game palettes and timer props are source assets; never redraw them here.
 
 outline = 'fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
 svg('grass', f'<g {outline}><path d="M24 43V8M24 28 10 13M24 35l14-19M12 43 6 27m30 16 7-14"/></g>',48,48)
@@ -107,7 +104,7 @@ svg('play', f'<g {outline}><path d="M14 12h20q6 0 8 9l3 15q0 7-6 4l-8-7H17l-8 7q
 for path in sorted(ART.glob('*.svg')):
     png = ART / f'{path.stem}.png'
     subprocess.run(['inkscape', str(path), '--export-type=png', '--export-background=white',
-                    '--export-background-opacity=255', '--export-width=384' if path.stem.startswith(('sheep_', 'pair_')) else '--export-width=192', f'--export-filename={png}'], check=True, capture_output=True)
+                    '--export-background-opacity=255', '--export-width=384' if path.stem.startswith(('sheep_', 'pair_', 'reading_', 'thinking_')) else '--export-width=192', f'--export-filename={png}'], check=True, capture_output=True)
     im = Image.open(png).convert('L').point(lambda x: 255 if x >= 160 else 0).convert('1')
     width, height = im.size
     pixels = im.load()

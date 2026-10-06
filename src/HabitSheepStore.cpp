@@ -11,7 +11,7 @@
 #include "SheepStateStore.h"
 
 namespace {
-constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 7;
+constexpr uint8_t HABIT_SHEEP_SCHEMA_VERSION = 8;
 
 const char* habitTypeName(const HabitType type) {
   if (type == HabitType::Pomodoro) return "pomodoro";
@@ -51,6 +51,7 @@ void HabitSheepStore::toJson(JsonDocument& doc) const {
   doc["enabled"] = enabled;
   doc["weekStart"] = weekStart;
   doc["orientation"] = orientation;
+  doc["homeFocus"] = homeFocus;
   doc["pausedSleepScreen"] = pausedSleepScreen;
 
   JsonArray habitArray = doc["habits"].to<JsonArray>();
@@ -83,6 +84,8 @@ bool HabitSheepStore::fromJson(JsonVariantConst doc) {
   if (weekStart > 6) weekStart = 1;
   orientation = doc["orientation"] | static_cast<uint8_t>(0);
   if (orientation > 3) orientation = 0;
+  homeFocus = doc["homeFocus"] | static_cast<uint8_t>(0);
+  if (homeFocus > 2) homeFocus = 0;
   pausedSleepScreen = doc["pausedSleepScreen"] | static_cast<uint8_t>(255);
 
   const char* storedSheepName = doc["sheepName"] | "";
@@ -161,6 +164,24 @@ bool HabitSheepStore::setOrientation(const uint8_t value) {
   if (saveToFile()) return true;
   orientation = previous;
   return false;
+}
+
+bool HabitSheepStore::setHomeFocus(const uint8_t value) {
+  if (value > 2) return false;
+  if (value == homeFocus) return true;
+  const uint8_t previous = homeFocus;
+  homeFocus = value;
+  if (saveToFile()) return true;
+  homeFocus = previous;
+  return false;
+}
+
+int HabitSheepStore::homeSelection(bool hasBook) const {
+  if (!enabled || homeFocus == 2) return hasBook ? 4 : 5;
+  if (homeFocus == 1) return 0;
+  for (size_t slot = 0; slot < activeHabitIds.size(); ++slot)
+    if (!activeHabitIds[slot].empty()) return static_cast<int>(slot) + 1;
+  return 1;
 }
 
 bool HabitSheepStore::setSheepName(const std::string& name) {

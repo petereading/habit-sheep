@@ -30,6 +30,8 @@ constexpr ArtBitmap SHEEP[] = {habitArt::sheep_00, habitArt::sheep_01, habitArt:
                                habitArt::sheep_12, habitArt::sheep_13, habitArt::sheep_14, habitArt::sheep_15,
                                habitArt::sheep_16, habitArt::sheep_17, habitArt::sheep_18, habitArt::sheep_19};
 constexpr ArtBitmap PAIRS[] = {habitArt::pair_00, habitArt::pair_01, habitArt::pair_02, habitArt::pair_03};
+constexpr ArtBitmap READING[] = {habitArt::reading_00, habitArt::reading_01, habitArt::reading_02};
+constexpr ArtBitmap THINKING[] = {habitArt::thinking_00, habitArt::thinking_01, habitArt::thinking_02};
 constexpr ArtBitmap GRASS_STOCK[] = {habitArt::grass_stock_0, habitArt::grass_stock_1, habitArt::grass_stock_2,
                                      habitArt::grass_stock_3};
 constexpr StrId NAMES[] = {
@@ -88,6 +90,10 @@ void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t po
     ink(r, habitArt::heart_empty, effectX, drawY + (2 - std::min<uint8_t>(2, effectStep)) * w / 16, w / 10, w / 10);
 }
 void grass(const GfxRenderer& r, int x, int y, int size) { ink(r, habitArt::grass, x, y, size, size); }
+void timerSheep(const GfxRenderer& r, int x, int y, int width, int height, bool thinking, uint8_t pose) {
+  const int w = std::min(width, height * 4 / 3), h = w * 3 / 4;
+  ink(r, thinking ? THINKING[pose % 3] : READING[pose % 3], x + (width - w) / 2, y + (height - h) / 2, w, h);
+}
 void grassStock(const GfxRenderer& r, int right, int y, int size, uint8_t stock) {
   constexpr int COUNT = 7, GAP = 4;
   const int left = right - COUNT * size - (COUNT - 1) * GAP;

@@ -41,6 +41,7 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   uint32_t modeRevision = 0;
   uint8_t weekStart = 1;
   uint8_t orientation = 0;
+  uint8_t homeFocus = 0;  // Habit, sheep, continue reading (physical-button Home only).
   uint8_t pausedSleepScreen = 255;
 
   HabitSheepStore();
@@ -68,6 +69,9 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   uint8_t getWeekStart() const { return weekStart; }
   uint8_t getOrientation() const { return orientation; }
   bool setOrientation(uint8_t value);
+  uint8_t getHomeFocus() const { return homeFocus; }
+  bool setHomeFocus(uint8_t value);
+  int homeSelection(bool hasBook) const;
   uint8_t getPausedSleepScreen() const { return pausedSleepScreen; }
   bool setEnabled(bool value, uint8_t sleepScreen = 255);
   bool setWeekStart(uint8_t value);

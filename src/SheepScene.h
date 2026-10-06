@@ -4,6 +4,7 @@
 #include <ctime>
 
 namespace sheepScene {
+inline uint8_t timerPose(const tm& local) { return (local.tm_hour * 12 + local.tm_min / 5) % 3; }
 inline bool mirrored(const tm& local, bool rest, bool eating) {
   uint32_t value = static_cast<uint32_t>(local.tm_year * 366 + local.tm_yday) * 144U;
   value += local.tm_hour * 6U + (eating ? 0U : local.tm_min / (rest ? 30U : 10U));
