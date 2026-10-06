@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="288" viewBox="0 0 384 288">
+<!-- Original rear view for Sheep Turn, matching the approved white wool and black ears/feet palette. -->
+<g stroke="black" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M132 211v44q0 16 17 16t17-16v-44M218 211v44q0 16 17 16t17-16v-44" fill="black"/>
+<path d="M136 45q-36-11-44 7q-4 17 35 21M248 45q36-11 44 7q4 17-35 21" fill="black"/>
+<path d="M151 75q-14-16-2-27q9-8 19-2q-1-17 15-19q14-3 20 12q14-10 24 0q11 10 3 24q19 2 15 19" fill="white"/>
+<path d="M101 202q-27 0-25-25q-24-12-12-35q-16-23 8-39q-5-25 23-28q8-24 33-15q15-24 39-10q25-20 48-3q26-12 41 11q27-5 32 21q29 5 23 31q23 17 7 39q11 26-15 36q0 26-28 26q-13 25-39 15q-23 18-46 3q-23 16-45-2q-26 10-43-25Z" fill="white"/>
+<path d="M183 144q-16-7-19 9q-16 3-10 18q-7 16 9 20q4 18 19 9q17 9 20-8q16-4 10-19q9-15-8-20q-4-16-21-9Z" fill="white"/>
+</g></svg>

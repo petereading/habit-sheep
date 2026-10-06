@@ -1,6 +1,6 @@
 # Habit Sheep — implemented screens and X3 verification
 
-Updated 2026-10-06. The 2026-10-06 timer, Home focus, artwork and four-game batch is implemented for X3 testing. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
+Updated 2026-10-06. The timer/Home-focus batch has an X3 test firmware. The later Sheep Turn/menu/maze-wall changes are source-only, awaiting the next authorized build. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
 
 ## Current implementation
 
@@ -17,7 +17,7 @@ Updated 2026-10-06. The 2026-10-06 timer, Home focus, artwork and four-game batc
 | Daily/weekly counts | Dedicated progress screen, week date range and confirmed Log one action. Week starts on any chosen weekday, default Monday. |
 | Pomodoro | Tool without a daily target. Home shows today's completed sessions; timer shows focuses until long break and phase progress. Default four focuses controls long breaks, not a reward goal. Manual breaks; Skip short break immediately starts focus. Unified `min`. |
 | Completion | Count/focus completions show double-line positive notices and actual gain or full-stock/save-failure notice. Reading/timed sessions award silently. |
-| Games | Pairs has six houses/three pairs: selecting opens a door, a miss stays visible until acknowledged, and matched houses remain open with a check. Lights out, Remember sheep and Sheep Maze fill the other three 2×2 menu entries. Previous/Next/Confirm/Back and direct touch work throughout. Remember waits for user confirmation to hide; Lights out toggles a house and its orthogonal neighbors, with Undo/restart; the random 7 × 7 maze fits one screen and has separate direction controls. No timed reflexes, dragging or food rewards. |
+| Games | Pairs has six houses/three pairs: selecting opens a door, a miss stays visible until acknowledged, and matched houses remain open with a check. Sheep Turn, Remember sheep and Sheep Maze fill the other three 2×2 menu entries (source update, not yet in a firmware). Previous/Next/Confirm/Back and direct touch work throughout. Remember waits for user confirmation to hide; Sheep Turn toggles the facing direction of a sheep and its orthogonal neighbors, with Undo/restart; the random 7 × 7 maze fits one screen and has separate direction controls. No timed reflexes, dragging or food rewards. |
 | Grass presentation | `Grass 21 / 21` in text settings; seven right-aligned three-blade symbols on Home and sleep (one blade per unit). Exact numerical stock in history. No decorative grass or ground line in sheep scenes. |
 | Awake poses | Twelve poses, ten-minute intervals, no repeat within two hours. Missed meals override with rest; only zero mood shows the foraging sign. |
 | Sleep selection | Display → Sleep Screen → Habit Sheep. No separate Sleep sheep scene setting. Date, battery without percentage, hearts below date, sheep, three passive habit progress icons. |
@@ -149,6 +149,17 @@ Settings → Habits → Home default selection offers First habit / Sheep / Cont
 
 The first Home loop treated the uninitialized mode-revision sentinel as a mode change and reset selection to the sheep. Home entry now snapshots the current revision when applying the selected default. A real mode change also reapplies the configured hardware default after resolving recent-book availability; touch behavior remains unchanged. Verify First habit, Sheep and Continue reading on entry, after several idle refreshes and after restart. Paused mode uses the reading dock.
 
+## P-044–P-047: Sheep Turn and game presentation — source-only, 2026-10-06
+
+Not compiled at the user's request. Last delivered firmware remains `15cd79a8`; these changes await the next authorized build and physical display checks.
+
+- P-044: Sheep Turn replaces Lights out. Nine visible sheep face the player or show their rear; no houses or tiny lamps. Turn one sheep and its orthogonal neighbors; all facing forward wins. The forward view uses approved pose 02; the rear has white wool/tail and black legs. Generation and Undo retain the previous XOR toggle rules: puzzles start from the solved state, so every generated puzzle and every subsequent reachable state has a solution. The existing 500-seed regression is renamed with the model, but has not been rerun/compiled for this source-only update.
+- P-045: The game popup reads `Play with [sheep name]`; unnamed sheep use the localized Sheep fallback. The existing title truncation keeps long names within the popup.
+- P-046: All four 2 × 2 buttons have an enlarged icon on the left and a two-line name on the right. Layout derives from the oriented safe area, and registered touch bounds remain the full button. Double outlines stay on the popup, single outlines on focused buttons.
+- P-047: Maze walls and the outer boundary increase from two to five pixels. Paths, controls and generation remain unchanged.
+
+Earlier Lights out descriptions below/above are historical and superseded by P-044. Test portrait/landscape, buttons/touch, the facing distinction at actual small size and maze wall clearance in the next firmware.
+
 ## Validation for the 2026-10-06 batch
 
 - Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.
@@ -171,7 +182,7 @@ Source evidence: HabitTimer.cpp rollover now covers Pomodoro as well as Duration
 9. Select Habit Sheep sleep mode before a meal. Check exactly one grass deducted, five-minute eating scene, then rest. Leave asleep across half-hour boundaries and wake manually. Compare overnight battery use with Cover sleep mode; scheduled wakes are X3-specific and require device validation.
 10. With no stock, verify missed meals show rest while hearts remain positive; zero hearts shows the foraging sign. Earn grass to return the sheep. Pause/resume and confirm there are no catch-up meal charges or automatic timer resume.
 
-11. Play Pairs (six houses), Lights out, Remember sheep and Sheep Maze using buttons. Confirm a wrong answer stays visible until acknowledged. Repeat by touch where available. Confirm long-press does not also trigger short-press interaction.
+11. Play Pairs (six houses), Sheep Turn, Remember sheep and Sheep Maze using buttons. Confirm a wrong answer stays visible until acknowledged. Repeat by touch where available. Confirm long-press does not also trigger short-press interaction.
 12. Open each habit’s History / statistics, check fourteen dates against known reading/count/focus records and test a weekly remainder crossing the first displayed date.
 
 13. At midnight, verify an unfinished focus resets to zero and waits for Start focus while completed-cycle progress remains. Repeat after sleep/restart. Combine device reading, paper timing and manual minutes across daily/weekly boundaries. Skip a waiting and running long break; no food is awarded for Skip.

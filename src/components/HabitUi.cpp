@@ -89,6 +89,21 @@ void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t po
   if (variant >= 4 && pose == 18)
     ink(r, habitArt::heart_empty, effectX, drawY + (2 - std::min<uint8_t>(2, effectStep)) * w / 16, w / 10, w / 10);
 }
+void facingSheep(const GfxRenderer& r, int x, int y, int width, int height, bool front) {
+  if (front) {
+    sheep(r, x, y, width, height, 2);
+    return;
+  }
+  const int w = std::min(width, height * 4 / 3), h = w * 3 / 4;
+  ink(r, habitArt::game_back, x + (width - w) / 2, y + (height - h) / 2, w, h);
+}
+void gameIcon(const GfxRenderer& r, int game, int x, int y, int size) {
+  if (game == 1) {
+    facingSheep(r, x, y, size, size, true);
+    return;
+  }
+  icon(r, game == 0 ? 16 : game == 2 ? 3 : 20, x, y, size);
+}
 void grass(const GfxRenderer& r, int x, int y, int size) { ink(r, habitArt::grass, x, y, size, size); }
 void timerSheep(const GfxRenderer& r, int x, int y, int width, int height, bool thinking, uint8_t pose) {
   const int w = std::min(width, height * 4 / 3), h = w * 3 / 4;

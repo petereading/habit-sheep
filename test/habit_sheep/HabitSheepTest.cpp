@@ -402,24 +402,24 @@ TEST_F(HabitSheepTest, MemoryGameKeepsMissVisibleUntilAcknowledgedAndFinishesFou
   EXPECT_EQ(game.reveal(0), SheepMemoryGame::Result::Ignored);
 }
 
-TEST(SheepPuzzleTest, LightsOutTogglesOrthogonalNeighborsAndSupportsUndo) {
-  EXPECT_EQ(SheepPuzzle::lightMask(4), 0x0BA);
-  EXPECT_EQ(SheepPuzzle::lightMask(0), 0x00B);
+TEST(SheepPuzzleTest, TurnSheepTogglesOrthogonalNeighborsAndSupportsUndo) {
+  EXPECT_EQ(SheepPuzzle::turnMask(4), 0x0BA);
+  EXPECT_EQ(SheepPuzzle::turnMask(0), 0x00B);
   for (uint32_t seed = 0; seed < 500; ++seed) {
     SheepPuzzle p;
-    p.reset(SheepPuzzle::Mode::LightsOut, seed);
-    EXPECT_NE(p.lightState(), 0);
-    const uint16_t before = p.lightState(), solution = p.solvingPresses();
+    p.reset(SheepPuzzle::Mode::TurnSheep, seed);
+    EXPECT_NE(p.turnState(), 0);
+    const uint16_t before = p.turnState(), solution = p.solvingPresses();
     p.choose(0);
     if (!p.complete()) {
       p.undo();
-      EXPECT_EQ(p.lightState(), before);
+      EXPECT_EQ(p.turnState(), before);
     }
-    p.reset(SheepPuzzle::Mode::LightsOut, seed);
+    p.reset(SheepPuzzle::Mode::TurnSheep, seed);
     for (uint8_t i = 0; i < 9; ++i)
       if (solution & (1U << i)) p.choose(i);
     EXPECT_TRUE(p.complete());
-    EXPECT_EQ(p.lightState(), 0);
+    EXPECT_EQ(p.turnState(), 0);
   }
 }
 

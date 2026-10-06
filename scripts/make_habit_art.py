@@ -104,7 +104,7 @@ svg('play', f'<g {outline}><path d="M14 12h20q6 0 8 9l3 15q0 7-6 4l-8-7H17l-8 7q
 for path in sorted(ART.glob('*.svg')):
     png = ART / f'{path.stem}.png'
     subprocess.run(['inkscape', str(path), '--export-type=png', '--export-background=white',
-                    '--export-background-opacity=255', '--export-width=384' if path.stem.startswith(('sheep_', 'pair_', 'reading_', 'thinking_')) else '--export-width=192', f'--export-filename={png}'], check=True, capture_output=True)
+                    '--export-background-opacity=255', '--export-width=384' if path.stem.startswith(('sheep_', 'pair_', 'reading_', 'thinking_', 'game_')) else '--export-width=192', f'--export-filename={png}'], check=True, capture_output=True)
     im = Image.open(png).convert('L').point(lambda x: 255 if x >= 160 else 0).convert('1')
     width, height = im.size
     pixels = im.load()

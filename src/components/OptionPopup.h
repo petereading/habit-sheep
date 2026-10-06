@@ -33,8 +33,10 @@ class OptionPopup {
  public:
   void setHabitStyle(bool value = true) { habitStyle = value; }
   void showGames(const char* sheepName, std::function<void(int)> callback) {
-    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_LIGHTS), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_MAZE)};
-    show(sheepName && *sheepName ? sheepName : tr(STR_SHEEP_GAMES), options, 4, 0, std::move(callback));
+    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_TURN), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_MAZE)};
+    show(tr(STR_SHEEP_PLAY_WITH), options, 4, 0, std::move(callback));
+    title += " ";
+    title += sheepName && *sheepName ? sheepName : tr(STR_SHEEP_DEFAULT_NAME);
     gameMenu = true;
   }
   void showInteractions(const char* sheepName, std::function<void(int)> callback) {
@@ -175,7 +177,7 @@ class OptionPopup {
     if (iconMenu || minuteMenu || gameMenu) {
       const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
       const int w = safe.width - 24;
-      const int h = std::min(minuteMenu ? 390 : gameMenu ? 350 : 220, safe.height - 24);
+      const int h = std::min(minuteMenu ? 390 : gameMenu ? 280 : 220, safe.height - 24);
       const int x = safe.x + 12, y = safe.y + (safe.height - h) / 2;
       renderer.fillRoundedRect(x, y, w, h, 12, Color::White);
       habitUi::popupFrame(renderer, x, y, w, h);
@@ -208,10 +210,12 @@ class OptionPopup {
                             px + (tile - renderer.getTextWidth(NOTOSANS_14_FONT_ID, ownedStrings[i].c_str())) / 2,
                             py + (tileH - renderer.getLineHeight(NOTOSANS_14_FONT_ID)) / 2, ownedStrings[i].c_str());
         else if (gameMenu) {
-          habitUi::icon(renderer, i == 0 ? 16 : i == 1 ? 23 : i == 2 ? 3 : 20, px + (tile - 40) / 2, py + 4, 40);
-          const auto text = renderer.truncatedText(SMALL_FONT_ID, ownedStrings[i].c_str(), tile - 8);
-          renderer.drawText(SMALL_FONT_ID, px + (tile - renderer.getTextWidth(SMALL_FONT_ID, text.c_str())) / 2,
-                            py + tileH - renderer.getLineHeight(SMALL_FONT_ID) - 2, text.c_str());
+          const int iconSize = std::clamp(std::min(tile / 3, tileH - 20), 40, 72);
+          const int textX = px + 12 + iconSize + 12, textW = px + tile - 12 - textX;
+          habitUi::gameIcon(renderer, i, px + 12, py + (tileH - iconSize) / 2, iconSize);
+          const int textH = renderer.getLineHeight(SMALL_FONT_ID) * 2;
+          UITheme::drawCenteredWrappedText(renderer, Rect{textX, py + (tileH - textH) / 2, textW, textH}, SMALL_FONT_ID,
+                                           ownedStrings[i].c_str(), 2);
         } else
           habitUi::interaction(renderer, i, px + (tile - 48) / 2, py + (tile - 48) / 2, 48);
         frame.hit(freeink::ui::Rect{static_cast<int16_t>(px), static_cast<int16_t>(py), static_cast<int16_t>(tile),

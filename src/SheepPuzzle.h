@@ -5,7 +5,7 @@
 
 class SheepPuzzle {
  public:
-  enum class Mode : uint8_t { LightsOut, Remember, Maze };
+  enum class Mode : uint8_t { TurnSheep, Remember, Maze };
   static constexpr uint8_t MAZE_SIZE = 7, MAZE_CELLS = MAZE_SIZE * MAZE_SIZE;
 
   void reset(Mode value, uint32_t seed) {
@@ -14,16 +14,16 @@ class SheepPuzzle {
     done = wrong = preview = hasUndo = false;
     if (mode == Mode::Maze)
       generateMaze();
-    else if (mode == Mode::LightsOut) {
-      lights = solution = 0;
+    else if (mode == Mode::TurnSheep) {
+      turnedAway = solution = 0;
       for (uint8_t i = 0; i < 9; ++i) {
         if (random() & 1U) {
-          lights ^= lightMask(i);
+          turnedAway ^= turnMask(i);
           solution ^= 1U << i;
         }
       }
-      if (!lights) {
-        lights ^= lightMask(4);
+      if (!turnedAway) {
+        turnedAway ^= turnMask(4);
         solution ^= 1U << 4;
       }
     } else {
@@ -40,11 +40,11 @@ class SheepPuzzle {
   }
   void choose(uint8_t index) {
     if (done) return;
-    if (mode == Mode::LightsOut && index < 9) {
-      previousLights = lights;
+    if (mode == Mode::TurnSheep && index < 9) {
+      previousTurned = turnedAway;
       hasUndo = true;
-      lights ^= lightMask(index);
-      done = lights == 0;
+      turnedAway ^= turnMask(index);
+      done = turnedAway == 0;
     } else if (mode == Mode::Remember && index < 4) {
       if (preview)
         preview = false;
@@ -60,15 +60,15 @@ class SheepPuzzle {
     }
   }
   void undo() {
-    if (mode != Mode::LightsOut || !hasUndo || done) return;
-    lights = previousLights;
+    if (mode != Mode::TurnSheep || !hasUndo || done) return;
+    turnedAway = previousTurned;
     hasUndo = false;
   }
   bool canUndo() const { return hasUndo; }
-  bool lit(uint8_t index) const { return index < 9 && (lights & (1U << index)); }
-  uint16_t lightState() const { return lights; }
+  bool backFacing(uint8_t index) const { return index < 9 && (turnedAway & (1U << index)); }
+  uint16_t turnState() const { return turnedAway; }
   uint16_t solvingPresses() const { return solution; }
-  static uint16_t lightMask(uint8_t index) {
+  static uint16_t turnMask(uint8_t index) {
     if (index >= 9) return 0;
     uint16_t mask = 1U << index;
     if (index >= 3) mask |= 1U << (index - 3);
@@ -95,9 +95,9 @@ class SheepPuzzle {
  private:
   std::array<uint8_t, 4> cells{};
   std::array<uint8_t, MAZE_CELLS> walls{};
-  Mode mode = Mode::LightsOut;
+  Mode mode = Mode::TurnSheep;
   uint32_t randomState = 1;
-  uint16_t lights = 0, previousLights = 0, solution = 0;
+  uint16_t turnedAway = 0, previousTurned = 0, solution = 0;
   uint8_t answer = 0, target = 0, position = 0;
   bool preview = false, done = false, wrong = false, hasUndo = false;
   uint32_t random() {
