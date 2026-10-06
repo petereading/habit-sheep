@@ -1,6 +1,6 @@
 # Habit Sheep — implemented screens and X3 verification
 
-Updated 2026-10-05. The second artwork/game/history batch is implemented for X3 testing. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
+Updated 2026-10-06. The second artwork/game/history batch is implemented for X3 testing. PR #1 stays draft on `feature/habit-sheep-v1`; merging into develop and submitting upstream remain unauthorized.
 
 ## Current implementation
 
@@ -100,6 +100,15 @@ Balancing intent: three grass earned covers three daily meals. Three 30-minute s
 The e7b4d83 sheep was manually reconstructed geometry and departed from the approved illustration proportions. Replace its twenty scene sources with monochrome pixel-contour SVGs taken from the approved awake/eating/interaction sheet and four-rest sheet. Original shape, head/body proportions, feet and expression are retained; detached labels/hearts/Z are removed, with upright heart/Z overlays placed on the correct head side. The icon-generation script preserves these SVG sources instead of redrawing them. PBM size stays 384×288, flash-only, without another framebuffer. Pixel contours preserve the approved illustration rather than promising infinite-resolution vector curves.
 
 Both grass and individual habit history show their two on-screen paging buttons only when MappedInputManager reports touch capability. The hardware-only UI keeps CrossPoint's mapped bottom hints; touch themes already suppress those hints. Habit history uses the same single-outline touch buttons and tap rectangles as grass history. X3 checks: only one Newer/Older control set; touch check: visible buttons still page correctly.
+
+## Pending cross-day bug checks — X3 report 2026-10-06
+
+Status: recorded only; investigation, fixes and regression tests are pending. No code change is included with this report.
+
+| ID | Report / pending check | Acceptance notes |
+| --- | --- | --- |
+| P-034 | An unfinished Pomodoro focus from yesterday carried five minutes into today. | Reproduce and identify whether the carry is in the timer display, today's totals or reward accounting. Check unfinished running/paused focus across local midnight, sleep and restart. Previous-date time must not be incorrectly credited to today's daily progress or rewarded twice. Preserve the separately agreed saved Pomodoro cycle counter; do not confuse it with daily progress. |
+| P-035 | Check Reading and other habits for the same cross-day problem. | Check combined device reading, paper timing and manual minutes, plus custom timed and count habits. Verify date attribution, daily reset and no prior-day daily remainder or duplicate grass credit, including pause/resume and restart. Weekly timed remainder may carry within the configured week only; verify the selected week boundary too. These checks have not yet been performed for this report. |
 
 ## X3 verification checklist
 
