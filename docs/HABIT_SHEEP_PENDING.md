@@ -172,6 +172,12 @@ The public name is CrossPoint Sheep. Update README, About, boot presentation and
 
 Use device local time: 07:00–21:59 shows approved open-eyed lying/rest pose 12 on the device sleep screen (and when a missed meal puts Home into rest). 22:00–06:59 rotates closed-eye sleep poses 13–15 at half-hour boundaries. Stable random mirroring remains. Eating takes priority and zero mood still uses the foraging notice. RTC maintenance wake scheduling, food/mood accounting and user-selected sleep screen stay unchanged. Daytime currently has one open-eyed rest pose plus mirrored variations; more daytime rest artwork can be added later. Existing scene regression expectations/boundary cases are updated but not compiled or run, per the source-only batch instruction.
 
+## P-050: Reset Habits settings — pending, requested 2026-10-06
+
+Add a Reset Habits option inside Settings → Habits, with a clear scope summary and confirmation before applying. Restore Habits-owned configuration to its fresh-install defaults only. Never invoke CrossPoint's global reset or overwrite other settings: reading/font/layout preferences, Display/Sleep Screen, Wi-Fi, OPDS, library/book progress and other CrossPoint configuration must remain intact. In particular, resetting the Habits enabled flag must not trigger the usual automatic Cover sleep-screen substitution.
+
+Before implementation, explicitly define whether the reset includes custom habit definitions/active slots, sheep name, food/mood/bond state or history. The user requested a settings reset; do not silently erase history or reset care state. A fresh care state would be nine grass and five hearts, so resetting to defaults alone would not quickly expose the zero-mood foraging scene. A separate temporary scene preview/test aid may be proposed for that purpose; it is not yet approved. Keep this entry pending; no reset code, build or test is authorized by the request to record this item.
+
 ## Validation for the 2026-10-06 batch
 
 - Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.
