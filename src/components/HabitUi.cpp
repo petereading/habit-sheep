@@ -90,19 +90,25 @@ void sheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t po
     ink(r, habitArt::heart_empty, effectX, drawY + (2 - std::min<uint8_t>(2, effectStep)) * w / 16, w / 10, w / 10);
 }
 void facingSheep(const GfxRenderer& r, int x, int y, int width, int height, bool front) {
-  if (front) {
-    sheep(r, x, y, width, height, 2);
-    return;
-  }
   const int w = std::min(width, height * 4 / 3), h = w * 3 / 4;
-  ink(r, habitArt::game_back, x + (width - w) / 2, y + (height - h) / 2, w, h);
+  ink(r, front ? habitArt::game_front : habitArt::game_back, x + (width - w) / 2, y + (height - h) / 2, w, h);
+}
+void sudokuSheep(const GfxRenderer& r, int x, int y, int width, int height, uint8_t symbol) {
+  if (symbol < 2)
+    facingSheep(r, x, y, width, height, symbol == 0);
+  else
+    sheep(r, x, y, width, height, 0, 255, symbol == 2);
 }
 void gameIcon(const GfxRenderer& r, int game, int x, int y, int size) {
   if (game == 1) {
     facingSheep(r, x, y, size, size, true);
     return;
   }
-  icon(r, game == 0 ? 16 : game == 2 ? 3 : 20, x, y, size);
+  if (game == 3) {
+    for (int i = 0; i < 4; ++i) sudokuSheep(r, x + i % 2 * size / 2, y + i / 2 * size / 2, size / 2, size / 2, i);
+    return;
+  }
+  icon(r, game == 0 ? 16 : 3, x, y, size);
 }
 void grass(const GfxRenderer& r, int x, int y, int size) { ink(r, habitArt::grass, x, y, size, size); }
 void timerSheep(const GfxRenderer& r, int x, int y, int width, int height, bool thinking, uint8_t pose) {

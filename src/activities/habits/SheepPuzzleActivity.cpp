@@ -42,7 +42,7 @@ void SheepPuzzleActivity::onEnter() {
   Activity::onEnter();
 }
 int SheepPuzzleActivity::optionCount() const {
-  return mode == SheepPuzzle::Mode::TurnSheep ? 11 : mode == SheepPuzzle::Mode::Maze ? 5 : 4;
+  return mode == SheepPuzzle::Mode::TurnSheep ? 12 : mode == SheepPuzzle::Mode::Maze ? 5 : 4;
 }
 bool SheepPuzzleActivity::selectable(int index) const {
   if (mode == SheepPuzzle::Mode::Maze && index < 4) return puzzle.canMove(index);
@@ -56,8 +56,15 @@ void SheepPuzzleActivity::moveSelection(int delta) {
   }
 }
 void SheepPuzzleActivity::choose() {
+  if (mode == SheepPuzzle::Mode::TurnSheep && selection == 10 && !puzzle.complete()) {
+    hinted = puzzle.hintIndex();
+    if (hinted < 9) selection = hinted;
+    requestUpdate();
+    return;
+  }
+  hinted = 255;
   if (puzzle.complete() || (mode == SheepPuzzle::Mode::Maze && selection == 4) ||
-      (mode == SheepPuzzle::Mode::TurnSheep && selection == 10)) {
+      (mode == SheepPuzzle::Mode::TurnSheep && selection == 11)) {
     puzzle.reset(mode, esp_random());
     steps = 0;
     selection = 0;
@@ -112,8 +119,8 @@ void SheepPuzzleActivity::loop() {
       }
   }
   if (mode == SheepPuzzle::Mode::TurnSheep) {
-    for (int i = 0; i < 2; ++i)
-      if (mappedInput.wasTapInRect(safe.x + 24 + i * (safe.width - 48) / 2, g.controlsY, (safe.width - 48) / 2,
+    for (int i = 0; i < 3; ++i)
+      if (mappedInput.wasTapInRect(safe.x + 24 + i * (safe.width - 48) / 3, g.controlsY, (safe.width - 48) / 3,
                                    g.controlsH)) {
         selection = 9 + i;
         choose();
@@ -138,7 +145,7 @@ void SheepPuzzleActivity::render(RenderLock&&) {
                         : turns ? tr(STR_SHEEP_TURN)
                                 : tr(STR_SHEEP_REMEMBER));
   const char* hint = maze                  ? tr(STR_SHEEP_MAZE_HELP)
-                     : turns               ? tr(STR_SHEEP_TURN_HELP)
+                     : turns               ? (hinted < 9 ? tr(STR_SHEEP_TURN_HINT) : tr(STR_SHEEP_TURN_HELP))
                      : puzzle.hasMistake() ? tr(STR_SHEEP_GAME_RETRY)
                      : puzzle.showing()    ? tr(STR_SHEEP_REMEMBER_SHOW)
                                            : tr(STR_SHEEP_REMEMBER_FIND);
@@ -190,15 +197,19 @@ void SheepPuzzleActivity::render(RenderLock&&) {
         habitUi::sheep(renderer, x + 8, y + 8, tile - 16, tile - 16, 0, puzzle.value(i));
       else
         habitUi::icon(renderer, 15, x + tile / 2 - 20, y + tile / 2 - 20, 40);
+      if (turns && hinted == i) {
+        habitUi::frame(renderer, x + 2, y + 2, tile - 4, tile - 4);
+        habitUi::icon(renderer, 21, x + tile - 26, y + 8, 18);
+      }
     }
     if (!turns && !puzzle.showing())
       habitUi::sheep(renderer, safe.x + safe.width / 2 - 40, safe.y + 104, 80, 48, 0, puzzle.targetValue());
     if (turns) {
-      const int width = (safe.width - 48) / 2;
-      for (int i = 0; i < 2; ++i) {
+      const int width = (safe.width - 48) / 3;
+      for (int i = 0; i < 3; ++i) {
         const int x = safe.x + 24 + i * width;
         habitUi::frame(renderer, x, g.controlsY, width - 8, g.controlsH - 8, selection == i + 9);
-        const char* label = i ? tr(STR_SHEEP_RESTART) : tr(STR_SHEEP_UNDO);
+        const char* label = i == 0 ? tr(STR_SHEEP_UNDO) : i == 1 ? tr(STR_SHEEP_HINT) : tr(STR_SHEEP_RESTART);
         renderer.drawText(SMALL_FONT_ID, x + (width - 8 - renderer.getTextWidth(SMALL_FONT_ID, label)) / 2,
                           g.controlsY + 10, label);
       }

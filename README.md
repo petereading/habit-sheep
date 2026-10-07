@@ -1,18 +1,22 @@
-# Habit Sheep
+# CrossPoint Sheep
 
-Habit Sheep is an e-ink habit companion and virtual sheep built as a thin fork of CrossPoint Reader.
+CrossPoint Sheep is an e-ink habit companion and virtual sheep built as a thin fork of CrossPoint Reader.
 
 The project keeps CrossPoint's reading features intact while adding a low-friction Home experience centred on a persistent sheep companion and up to three currently active habits. Users can save up to nine habits and swap which three are active for weekdays, weekends, holidays, or other routines.
 
-Habit Sheep is designed around positive reinforcement: completing habits grows the pasture and interacting with the sheep builds familiarity. Missing a habit never harms the sheep or removes progress. Reading remains optional; CrossPoint's reading shortcuts stay available without turning reading into an obligation.
+CrossPoint Sheep is designed around positive reinforcement: completed focus sessions, timed sessions and counts earn grass, while interacting with the sheep builds familiarity. The sheep eats three times daily, rests after missed meals and goes foraging at zero mood; it never dies. Pause Habits during busy periods. Reading remains optional; CrossPoint's reading shortcuts stay available without turning reading into an obligation.
 
-Development is currently on the `feature/habit-sheep-v1` branch. See `docs/HABIT_SHEEP_V1.md` for the frozen V1 product/architecture specification and `docs/UPSTREAM_POLICY.md` for the one-way CrossPoint sync policy.
+The V1 public-test candidate includes Pairs, Sheep Turn with hints, Remember sheep and randomly generated 4×4 Sheep-doku. Settings → Habits → Reset Habits requires two confirmations and resets only habit settings/history/care, preserving books and CrossPoint settings.
+
+Development is currently on the `feature/habit-sheep-v1` branch. See `docs/HABIT_SHEEP_V1.md` for the current V1 product/architecture specification and `docs/UPSTREAM_POLICY.md` for the one-way CrossPoint sync policy.
+
+See [the public test guide](docs/CROSSPOINT_SHEEP_PUBLIC_TEST.md) for Reset, games and X3 checks. This is a test candidate; PR #1 remains draft.
 
 ---
 
 ## CrossPoint Reader upstream
 
-Habit Sheep is based on the open-source CrossPoint Reader project. The upstream README is retained below for device support, reader features, setup information, and project credits.
+CrossPoint Sheep is based on the open-source CrossPoint Reader project. The upstream README is retained below for device support, reader features, setup information, and project credits.
 
 # CrossPoint Reader
 

@@ -1,168 +1,54 @@
-# Habit Sheep V1 Product & Architecture Spec
+# CrossPoint Sheep V1 — current product and architecture
 
-Habit Sheep is an e-ink habit companion and virtual sheep built as a thin fork of CrossPoint Reader. It preserves CrossPoint's reading experience while making three user-selected habits and a persistent sheep companion immediately accessible from Home.
+CrossPoint Sheep is a thin fork of CrossPoint Reader for quiet reading and habit formation. This document describes the implemented V1 public-test candidate, superseding earlier draft rules. The repository stays `petereading/habit-sheep`; the implementation branch is `feature/habit-sheep-v1` and PR #1 remains draft. Public testing does not authorize a release, merge or upstream submission.
 
-## Product principles
+## Habits and rewards
 
-- Habit formation is the primary goal. The sheep provides feedback, companionship and optional entertainment; care and games must remain optional.
-- CrossPoint remains a reader. Habit Sheep must not make reading feel compulsory.
-- The sheep and habit system must be fully useful offline and without AI.
-- Positive reinforcement only: no starvation, illness, death, punishment, guilt, or grass debt for missed habits.
-- Keep the low-end ESP32-C3 devices as the baseline. Touch and higher-memory devices may add richer interactions without changing core functionality.
-- Minimise friction: most daily actions should be possible directly from Home.
-- Preserve upstream CrossPoint navigation and reader capabilities wherever practical.
+Save up to nine habits, with three active Home slots. Fresh installations and Reset Habits seed Reading (30 min/session), Pomodoro (25 min focus, four focuses before long break) and an empty third slot. Saved user definitions/history survive firmware upgrades. Reading is optional: it may be removed without disabling CrossPoint reading.
 
-## Habits
+Every completed count, Pomodoro focus or whole accumulated timed/reading session earns **one grass**, including beyond a daily/weekly target. Targets describe progress and never gate rewards. Pomodoro is a tool without a daily target; four focuses controls the long-break cycle only. Breaks start manually. Skip on waiting/running short or long breaks starts the next focus immediately without a reward.
 
-- Users may save up to 9 habits in a Habit Library.
-- Up to 3 habits are Active at one time and shown on Home.
-- Active habits can be swapped without deleting their history.
-- Long-pressing an Active habit opens a replacement picker.
-- Active habits can also be managed in Settings / Web Settings.
-- No automatic weekday/weekend scheduling in V1. Users can manually swap habits for weekends, holidays, travel, etc.
-- V1 habit types:
-  - Completion: complete once for the configured period/day.
-  - Duration: accumulate minutes toward a target.
-- Duration habits support Start, Pause, Stop, and manual +minutes logging.
-- Reaching a Duration target checkpoints elapsed time and shows the reward while the timer keeps running. Stopping later logs only the remaining time.
-- Short Pomodoro breaks may be skipped to start the next focus immediately. Skipping never earns grass.
-- While a Duration timer is actively running, automatic sleep is prevented.
-- E-ink does not need a per-second redraw. Time is calculated from timestamps; the screen may refresh at a low cadence and immediately after input.
+Reading integrates device reading, paper-book timing and manual minutes into one total. Timed habits award whole sessions silently; fractions remain in the current daily/weekly period. Daily fractions never carry into tomorrow. Weekly fractions stay within the configured week. The week boundary defaults to Monday and can be changed. Editing session length or upgrading does not retroactively revalue stock or recorded rewards. Count/focus completions show positive reward notices, including honest full-stock/save-failure messages.
 
-## Reading is optional
+Timers use timestamps with low-frequency e-ink refresh. Active duration timing prevents automatic sleep. Paper/device reading is split across local midnight; unfinished Pomodoro time from yesterday is cleared while completed-cycle progress is retained. Paused mode freezes habit recording/timers and never silently resumes a timer.
 
-Reading is not a required or default obligation. The CrossPoint dock always provides quick access to reading, independent of the user's three Active habits.
+## Home, input and artwork
 
-A Duration habit may optionally enable CrossPoint Reading integration. When enabled, selecting that habit provides:
-- live manual timer logging for paper books or other reading;
-- manual +minutes logging;
-- Continue Reading;
-- Browse Files / books;
-- automatic CrossPoint active-reading events, including correct allocation across local calendar days. Reward notices appear on returning Home.
+Home has three top habit icons, a date/minute clock/battery header, five mood hearts, seven right-aligned grass symbols, a central sheep, and six original dock entries: Continue reading, Browse files, Library, OPDS, Transfer, Settings. Each three-blade grass symbol represents three units. Selecting/tapping stock opens the fourteen-day grass tracker. Each habit's own History / statistics is available within its settings.
 
-If no habit has Reading integration, CrossPoint reading remains normal and does not create a daily reading obligation.
+Short sheep press/tap interacts; long press opens `Play with [name]`, a 2 × 2 game popup. Active habit long press opens replacement selection. Button-only Home default is configurable as first habit, sheep or Continue reading; Back retains fast reading access. Touch uses direct targets. Habits orientation independently offers portrait, landscape clockwise, portrait inverted and landscape counterclockwise.
 
-## Habit event model
+Ordinary focus has one outline; popup windows have two. Sheep scenes have no decorative grass or ground line; eating alone shows grass. Twenty companion poses with stable random mirroring preserve the approved white wool/black face and feet palette. Twelve awake poses change every ten minutes without repeat within two hours. Reading/focus screens have themed sheep changing every five minutes. Interactions use one/one/three-second stages (five seconds total). Artwork is packed one-bit flash data, scaled into the existing framebuffer; no extra framebuffer is allocated.
 
-Store append-style events rather than only mutable daily totals so later multi-device sync is possible.
+## Care, pause and sleep
 
-Each event should have, at minimum:
-- stable event ID;
-- stable habit ID;
-- timestamp;
-- amount;
-- unit / event type;
-- source.
+Grass is the only resource. Stock cap is 21, initially nine. Local meals at **08:00, 13:00 and 19:00** consume one each and restore one mood heart up to five. Missed meals show rest; a completely empty day loses one heart. At zero hearts the sheep goes to find food, with no death, illness or food debt. New grass returns it and may use one remaining daily meal slot, never a fourth meal. Stock limits actual gain, while all completed habit events remain recorded; there is no deferred excess reward.
 
-Candidate sources include manual completion, manual timer, manual adjustment, and CrossPoint reader. Daily/weekly totals are derived views.
+Interactions/game completion improve relationship at most once per local date, without grass rewards. Completely empty days gently reduce relationship while mood remains positive. Habit mode Off preserves records and freezes food/mood/relationship decline. Home shows the recent book. Normal pause temporarily chooses Cover sleep, respects explicit display changes, and resumes without catch-up meal charges.
 
-## Habit Sheep Home
+Display → Sleep Screen → CrossPoint Sheep selects the additional scene; existing Cover and other modes remain available. Sheep sleep displays date, battery without percentage, hearts, grass and passive habit progress, with no clock/countdown. Home keeps its battery percentage. At local 07:00–21:59 a resting sheep has open eyes; 22:00–06:59 uses sleeping poses. X3 schedules half-hour RTC maintenance wakes, including meals; successful meals show eating for five minutes before rest. Missed meals rest and zero hearts forage. Other sleep choices do not schedule these sheep wakes. Physical overnight battery/refresh behavior remains to be validated.
 
-Habit Sheep Home is a dedicated Home mode, not merely a global UI theme. Users should still be able to use the normal CrossPoint styling on Library, Settings, Reader, etc.
+## Games
 
-Home hierarchy:
-1. Sheep + current grass stock: the largest visual area.
-2. Up to 3 Active habits.
-3. Bottom icon dock containing CrossPoint's existing major functions.
+The four entries are Pairs, Sheep Turn, Remember sheep and Sheep-doku. No reaction timing or dragging is required; all use Previous/Next/Confirm/Back and touch.
 
-The dock reuses CrossPoint's existing monochrome icons but removes text labels. Typical entries include:
-- open book: Continue Reading;
-- folder: Browse Files;
-- books: OPDS Browser;
-- other major CrossPoint functions such as transfer/settings as appropriate.
+- Pairs uses six houses/three pairs, open doors and acknowledged mismatches.
+- Sheep Turn toggles one sheep and orthogonal neighbours; face all sheep forward. Every generated state is solvable. Undo and Hint work from the current board. Hint highlights a sheep without turning it automatically.
+- Remember sheep shows positions until the user is ready, then asks where a sheep was.
+- Sheep-doku generates unique-solution 4 × 4 Sudoku boards with four 2 × 2 regions and front/rear/left/right sheep. Each row/column/region uses each symbol once. Fixed clues have a dot; editable cells offer a sheep chooser and Clear, with Undo/Hint/Restart. Hint waits for confirmation. Logical symbols are never randomly mirrored.
 
-Button-only navigation:
-- Up / Down cycles through interactive Home targets, including sheep, Active habits, and dock icons.
-- Confirm activates the selected target.
-- Existing quick reading access should remain low-friction.
+Maze remains in source/model/tests without a menu entry. Pushing grass and optional turn-based games against the sheep are V2 ideas, not V1 commitments.
 
-Touch devices:
-- Direct tap on sheep, habits, and dock icons.
-- Long-press Active habit to replace it.
+## Reset and persistence
 
-## Sheep identity and relationship
+Settings → Habits → Reset Habits requires two independent confirmations, each initially Cancel. It deletes Habits history, custom definitions, sheep name, timers and relationship and restores the defaults above (mode On, Monday, portrait, first-habit Home focus, nine grass/five hearts). Reset is permanent after confirmation.
 
-- Users name their sheep during onboarding and may rename it later in Settings.
-- Sheep appearance is customisation, not tied to habit category.
-- Ordinary sheep interaction does not count as habit completion.
-- Habit completion replenishes the grass stock.
-- Sheep interaction contributes to relationship/bond.
-- Mood display uses up to five hearts. Mood and relationship remain distinct.
-- Bond is initially expressed through behaviour, e.g. looking at the user, approaching, resting nearby, or running over when called. Revisit the presentation after testing if these cues are not clear enough.
-- No penalty for not interacting.
+Only `/.crosspoint/habit_sheep.json`, `habit_sheep_state.json`, `habit_timers.json` and `habit_events` are replaced. CrossPoint settings, Display/Sleep Screen, Wi-Fi, OPDS, books and reading progress are preserved. Reset bypasses normal mode-toggle behavior so it does not change the sleep choice. Verified staging/journal markers allow interruption rollback before commit and cleanup after commit; a failed recovery blocks Habits writes until repaired/retried.
 
-## Sheep life and pasture
+Events are append-style and totals are derived. Stock/history persist locally through the storage HAL. Bounded fixed-size puzzle state lives in its ActivityManager-owned activity; new screens use fallible allocation. No additional framebuffer or runtime bitmap buffer is introduced on ESP32-C3.
 
-The functional firmware advances coarse daytime wandering and night/rest poses without continuous animation. Formal grazing, walking and return animation frames belong to the next artwork phase.
+## Scope and validation
 
-Persist meal progress and advance coarse state on wake or while awake. Meals are at local 08:00, 13:00 and 19:00, each consuming one grass; no scheduled wake is introduced. Grass is the only resource, stock cap 21, fresh stock nine. Existing stock/history survive upgrade and establish a new meal baseline without retroactive charges. There are no coins or purchases, food debt, starvation or death.
+V1 works offline with no AI/backend/key. AI policy, multi-device sync and extra games remain future scope. See [public test guide](CROSSPOINT_SHEEP_PUBLIC_TEST.md) and [implementation/checklist](HABIT_SHEEP_PENDING.md). Unit/storage/model and host layout tests do not establish physical e-ink quality, battery life or resolution of the earlier freeze report.
 
-- Valid daily count completions, duration/reading targets and Pomodoro focuses earn +3. Weekly count goals below seven apportion 21 across target completions; goals with seven or more earn +3 per completion. Full stock still records the habit, with an honest positive notice.
-- Mood uses five hearts. Eating restores one, up to five; a completely empty local day costs one. A missed meal shows rest; zero mood means foraging. Replenishment returns the sheep, consuming at most one of the day's three meal slots immediately if available.
-- Optional hello or a completed Sheep pairs game improves relationship at most once daily. Relationship is expressed through position and response. Completely empty days gently reduce bond while mood remains positive. Games never create grass or log a habit.
-- The 14-day grass ledger records actual gains and consumption and marks paused dates. It is an aggregate tracker, not individual habit statistics.
-- Week starts on is configurable for all seven weekdays, default Monday. Boundary changes recalculate progress without rewriting or rewarding historical events.
-- Habit mode Off freezes care and recording, preserves paused timer elapsed time, and resumes without catch-up deductions. Home becomes a recent-book cover/title tile with the reader dock. It sets the real Display Cover sleep choice temporarily and restores the remembered choice unless the user changes it explicitly while paused.
-- Sheep pairs is a short four-pair memory game with button/touch input, acknowledged mismatches, immediate Back exit, no coins or XP, and no timed animation.
-
-See `HABIT_SHEEP_PENDING.md` for the functional X3 checklist. Formal artwork starts after this firmware passes hardware testing.
-
-## Sleep screen
-
-Habit Sheep provides a dedicated static sleep scene using the e-ink panel's image retention.
-
-Select Habit Sheep in Display → Sleep Screen. Cover and the other existing choices remain available; there is no separate sheep-scene toggle. The legacy effective choice is migrated once. Quick Resume retains its existing timeout rules. Home and habit timer screens show a clock updated on minute changes while awake; the static sheep sleep screen does not.
-
-The sleep scene should prioritise:
-- sheep + persistent pasture;
-- Active habit progress;
-- date;
-- coarse battery icon.
-
-Do not show information that falsely appears live while the device is off, such as a running clock or countdown.
-
-Timed wake may later update daily rollover / coarse sheep state / sleep scene and return to sleep without Wi-Fi.
-
-## Battery display
-
-Habit Sheep never displays a numeric battery percentage.
-
-Use approximately 10 coarse battery icon states, changing at roughly 10% boundaries. This avoids implying precision that the battery estimate cannot justify. Charging may add a charging indicator.
-
-Use the same rule on Home and sleep screens.
-
-## Optional AI Brain
-
-AI is optional enhancement only. No API key means a complete product.
-
-Architecture:
-- local RulePolicy always available;
-- optional remote behaviour policy;
-- provider adapters for OpenCode Zen and OpenRouter;
-- BYOK through Web Settings;
-- no Habit Sheep-owned backend and no user-deployed Worker.
-
-API keys:
-- stored locally;
-- never returned in full by the Web UI/API after saving;
-- replace/remove controls;
-- HTTPS only;
-- never log keys;
-- recommend a dedicated low-limit key.
-
-Remote AI should receive only minimal behavioural state where possible, not habit names or unnecessary personal text. It chooses from a bounded action vocabulary; invalid/failed responses immediately fall back to local rules. AI must never block Home, habit logging, sleep, or reading.
-
-## Upstream relationship
-
-CrossPoint is a read-only upstream. Habit Sheep only pulls/merges upstream changes into this repository; Habit Sheep-specific commits are never pushed back upstream. See `docs/UPSTREAM_POLICY.md`.
-
-## Initial engineering direction
-
-Keep the fork close to upstream CrossPoint:
-- dedicated Habit Sheep modules for habit state/events, sheep state/pasture, behaviour policy, and UI;
-- a Habit Sheep Home UI component owned by the existing HomeActivity, keeping ActivityManager/Home semantics upstream-compatible while avoiding unrelated screen changes;
-- reuse CrossPoint input abstraction, icons, reader navigation, web settings, storage/HAL, and sleep infrastructure;
-- keep device-specific code behind existing HAL/capability boundaries;
-- minimise RAM use and avoid full-screen duplicate buffers on ESP32-C3.
-
-V1 implementation should proceed in small independently testable slices. Do not open a pull request or trigger expensive CI repeatedly during early development.
+CrossPoint remains a read-only upstream; preserve its reading capabilities and attribution. See [upstream policy](UPSTREAM_POLICY.md). No upstream submission is authorized.

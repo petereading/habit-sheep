@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
+#include "HabitReset.h"
 #include "activities/UiTabListActivity.h"
 #include "components/OptionPopup.h"
 
@@ -37,6 +38,7 @@ enum class SettingAction {
   HabitWeekStart,
   HabitOrientation,
   HabitHomeFocus,
+  HabitReset,
   SheepMemory,
 };
 
@@ -196,6 +198,8 @@ class SettingsActivity final : public UiTabListActivity {
   bool quickResumeTimeoutAutoEnabled = false;
 
   OptionPopup optionPopup;
+  HabitResetConfirmation resetConfirmation;
+  void showHabitReset();
 
   // Row structure (label/actionValue) for *currentSettings, rebuilt only when
   // the active category or a category's setting list changes

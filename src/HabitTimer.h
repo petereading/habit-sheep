@@ -12,6 +12,7 @@ class HabitTimer : public PersistableStore<HabitTimer> {
   enum class Phase : uint8_t { Focus = 0, ShortBreak = 1, LongBreak = 2 };
 
   static const char* getFilePath() { return "/.crosspoint/habit_timers.json"; }
+  static bool writeDefaults(const char* path);
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
 

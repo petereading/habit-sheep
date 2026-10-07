@@ -19,6 +19,7 @@ class SheepStateStore : public PersistableStore<SheepStateStore> {
 
   static const char* getFilePath() { return "/.crosspoint/habit_sheep_state.json"; }
 
+  static bool writeDefaults(const char* path);
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
 

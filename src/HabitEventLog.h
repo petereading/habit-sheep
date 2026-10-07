@@ -26,6 +26,7 @@ class HabitEventLog {
   static HabitEventLog& getInstance();
   bool takeReward(RewardNotice& notice, const std::string* habitId = nullptr);
 
+  void clearCacheAfterReset();
   bool refreshToday();
   HabitDailyProgress progressForToday(const std::string& habitId);
   bool progressOnDay(const std::string& habitId, const char* day, HabitDailyProgress& result, char* line,

@@ -26,6 +26,7 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HabitReset.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
 #include "KOReaderCredentialStore.h"
@@ -453,6 +454,8 @@ void setup() {
   // UTC-offset setting on first boot after the update).
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
+  const bool habitResetRecovered = recoverHabitReset();
+  if (!habitResetRecovered) LOG_ERR("HABIT", "Reset recovery needs a working SD card; habits paused");
   HABIT_SHEEP.loadFromFile();
   if (!SETTINGS.habitSheepSleepMigrated) {
     if (HABIT_SHEEP.legacySleepSceneEnabled() && SETTINGS.sleepScreen != CrossPointSettings::QUICK_RESUME)
@@ -462,6 +465,7 @@ void setup() {
   }
   HABIT_TIMER.loadFromFile();
   SHEEP_STATE.loadFromFile();
+  if (!habitResetRecovered) HABIT_SHEEP.blockForResetRecovery();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();

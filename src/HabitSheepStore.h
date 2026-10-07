@@ -57,6 +57,7 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
  public:
   static const char* getFilePath() { return "/.crosspoint/habit_sheep.json"; }
 
+  static bool writeDefaults(const char* path);
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
 
@@ -64,6 +65,11 @@ class HabitSheepStore : public PersistableStore<HabitSheepStore> {
   const std::vector<HabitDefinition>& getHabits() const { return habits; }
   const std::array<std::string, MAX_ACTIVE_HABITS>& getActiveHabitIds() const { return activeHabitIds; }
   uint32_t getModeRevision() const { return modeRevision; }
+  void notifyReset() { ++modeRevision; }
+  void blockForResetRecovery() {
+    enabled = false;
+    ++modeRevision;
+  }
   bool clearPausedSleepScreen();
   bool isEnabled() const { return enabled; }
   uint8_t getWeekStart() const { return weekStart; }

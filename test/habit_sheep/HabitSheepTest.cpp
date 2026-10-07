@@ -8,12 +8,14 @@
 #include "HabitDayTime.h"
 #include "HabitEventLog.h"
 #include "HabitHistoryMath.h"
+#include "HabitReset.h"
 #include "HabitSheepStore.h"
 #include "HabitTimer.h"
 #include "SheepMemoryGame.h"
 #include "SheepPuzzle.h"
 #include "SheepScene.h"
 #include "SheepStateStore.h"
+#include "SheepSudoku.h"
 #include "components/HabitClock.h"
 #include "components/PopupCallback.h"
 
@@ -49,7 +51,8 @@ class HabitSheepTest : public ::testing::Test {
     habitTestMillis = 1;
     habitTestSaveFailure = false;
     habitTestSnapshots.clear();
-    Storage.files.clear();
+    Storage = {};
+    ASSERT_TRUE(recoverHabitReset());
     halClock.available = true;
     date(1);
     HabitEventLog::RewardNotice reward;
@@ -1065,4 +1068,192 @@ TEST_F(HabitSheepTest, FreshDefaultsAreReadingFocusAndEmptyButSavedEmptyLibraryS
   ASSERT_TRUE(HABIT_SHEEP.fromJson(cleared));
   EXPECT_TRUE(HABIT_SHEEP.getHabits().empty());
   EXPECT_EQ(HABIT_SHEEP.homeSelection(true), 1);
+}
+
+TEST(SheepSudokuTest, GeneratedBoardsAreUniqueAndAllHintsCompleteAcrossSeeds) {
+  for (uint32_t seed = 0; seed < 1000; ++seed) {
+    SheepSudoku game;
+    game.reset(seed);
+    EXPECT_EQ(SheepSudoku::countSolutions(game.givens()), 1);
+    EXPECT_FALSE(game.complete());
+    for (int i = 0; i < 16; ++i) {
+      if (game.fixed(i)) EXPECT_FALSE(game.set(i, 0));
+    }
+    for (int n = 0; n < 16 && !game.complete(); ++n) {
+      const auto at = game.hintCell();
+      ASSERT_LT(at, 16);
+      ASSERT_TRUE(game.set(at, game.hintValue(at)));
+    }
+    EXPECT_TRUE(game.complete());
+    EXPECT_EQ(game.hintCell(), 255);
+  }
+}
+TEST(SheepSudokuTest, ClearUndoAndHintsCorrectWrongEntries) {
+  SheepSudoku game;
+  game.reset(8);
+  const auto at = game.hintCell(), value = game.hintValue(at);
+  EXPECT_TRUE(game.set(at, value % 4 + 1));
+  EXPECT_EQ(game.hintCell(), at);
+  EXPECT_TRUE(game.set(at, 0));
+  EXPECT_EQ(game.value(at), 0);
+  game.undo();
+  EXPECT_EQ(game.value(at), value % 4 + 1);
+  EXPECT_FALSE(game.set(16, 1));
+  EXPECT_FALSE(game.set(at, 5));
+  std::array<uint8_t, 16> empty{};
+  EXPECT_EQ(SheepSudoku::countSolutions(empty), 2);
+  empty[0] = empty[1] = 1;
+  EXPECT_EQ(SheepSudoku::countSolutions(empty), 0);
+}
+TEST(SheepPuzzleTest, HintTracksArbitraryMovesAndUndoWithoutApplyingMove) {
+  for (uint32_t seed = 0; seed < 500; ++seed) {
+    SheepPuzzle game;
+    game.reset(SheepPuzzle::Mode::TurnSheep, seed);
+    for (int n = 0; n < 12 && !game.complete(); ++n) {
+      game.choose((seed + n) % 9);
+      if (n % 3 == 0) game.undo();
+    }
+    for (int n = 0; n < 9 && !game.complete(); ++n) {
+      const auto before = game.turnState();
+      const auto hint = game.hintIndex();
+      ASSERT_LT(hint, 9);
+      EXPECT_EQ(game.turnState(), before);
+      game.choose(hint);
+    }
+    EXPECT_TRUE(game.complete());
+    EXPECT_EQ(game.hintIndex(), 255);
+  }
+}
+TEST(HabitResetTest, BothConfirmationsAreRequiredAndCancelDoesNotApprove) {
+  HabitResetConfirmation confirm;
+  EXPECT_FALSE(confirm.choose(true));
+  confirm.begin();
+  EXPECT_FALSE(confirm.choose(false));
+  EXPECT_FALSE(confirm.second());
+  EXPECT_FALSE(confirm.choose(true));
+  confirm.begin();
+  EXPECT_FALSE(confirm.choose(true));
+  EXPECT_TRUE(confirm.second());
+  EXPECT_FALSE(confirm.choose(false));
+  EXPECT_FALSE(confirm.choose(true));
+  confirm.begin();
+  EXPECT_FALSE(confirm.choose(true));
+  EXPECT_TRUE(confirm.choose(true));
+  EXPECT_FALSE(confirm.choose(true));
+}
+TEST_F(HabitSheepTest, ResetClearsAllOwnedStateAndPreservesReaderFiles) {
+  HABIT_SHEEP.setSheepName("Pete's sheep");
+  HABIT_SHEEP.setWeekStart(0);
+  HABIT_SHEEP.setOrientation(3);
+  HABIT_SHEEP.setHomeFocus(2);
+  ASSERT_TRUE(HABIT_EVENTS.appendCompletion("completion"));
+  ASSERT_TRUE(HABIT_TIMER.start("pomodoro"));
+  advance(30);
+  Storage.ensureDirectoryExists("/.crosspoint/habit_events");
+  Storage.files["/.crosspoint/habit_events/2025-01-01.jsonl"] = "old habit history";
+  const TestStorage::Files protectedFiles = {{"/.crosspoint/settings.json", "reader, font, sleep screen, Wi-Fi"},
+                                             {"/.crosspoint/state.json", "current book"},
+                                             {"/.crosspoint/epub_a/progress.bin", "book progress"},
+                                             {"/books/book.epub", "book"},
+                                             {"/.crosspoint/opds.json", "server"}};
+  for (const auto& item : protectedFiles) Storage.files[item.first] = item.second;
+  const auto revision = HABIT_SHEEP.getModeRevision();
+  ASSERT_TRUE(resetHabits());
+  EXPECT_FALSE(habitResetPending());
+  EXPECT_EQ(HABIT_SHEEP.getModeRevision(), revision + 1);
+  EXPECT_TRUE(HABIT_SHEEP.isEnabled());
+  EXPECT_TRUE(HABIT_SHEEP.getSheepName().empty());
+  EXPECT_EQ(HABIT_SHEEP.getWeekStart(), 1);
+  EXPECT_EQ(HABIT_SHEEP.getOrientation(), 0);
+  EXPECT_EQ(HABIT_SHEEP.getHomeFocus(), 0);
+  ASSERT_EQ(HABIT_SHEEP.getHabits().size(), 2);
+  EXPECT_EQ(HABIT_SHEEP.getActiveHabitIds()[0], "reading");
+  EXPECT_EQ(HABIT_SHEEP.getActiveHabitIds()[1], "pomodoro");
+  EXPECT_TRUE(HABIT_SHEEP.getActiveHabitIds()[2].empty());
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 9);
+  EXPECT_EQ(SHEEP_STATE.getMood(), 5);
+  EXPECT_EQ(SHEEP_STATE.getBondPoints(), 0);
+  EXPECT_FALSE(HABIT_TIMER.isActive());
+  EXPECT_EQ(HABIT_EVENTS.progressForToday("completion").completionCount, 0);
+  HabitEventLog::RewardNotice notice;
+  EXPECT_FALSE(HABIT_EVENTS.takeReward(notice));
+  EXPECT_FALSE(Storage.exists("/.crosspoint/habit_events/2025-01-01.jsonl"));
+  for (const auto& item : protectedFiles) EXPECT_EQ(Storage.files[item.first], item.second);
+  ASSERT_TRUE(HABIT_SHEEP.loadFromFile());
+  ASSERT_TRUE(SHEEP_STATE.loadFromFile());
+  ASSERT_TRUE(HABIT_TIMER.loadFromFile());
+  SHEEP_STATE.settleDay();
+  EXPECT_EQ(SHEEP_STATE.getGrassStock(), 9);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).earned, 0);
+  EXPECT_EQ(SHEEP_STATE.grassForDay(20261001).eaten, 0);
+}
+TEST_F(HabitSheepTest, ResetWriteFailureLeavesLiveDataAndRunningTimerAlone) {
+  ASSERT_TRUE(HABIT_TIMER.start("pomodoro"));
+  advance(20);
+  const auto before = Storage.files;
+  habitTestSaveFailure = true;
+  EXPECT_FALSE(resetHabits());
+  EXPECT_FALSE(habitResetPending());
+  EXPECT_TRUE(HABIT_TIMER.isRunning());
+  EXPECT_EQ(HABIT_TIMER.elapsedSecondsFor("pomodoro"), 20);
+  for (const auto& item : before) EXPECT_EQ(Storage.files[item.first], item.second);
+}
+TEST_F(HabitSheepTest, PowerInterruptionAtEveryTransactionCheckpointRecoversCoherently) {
+  ASSERT_TRUE(HABIT_SHEEP.saveToFile());
+  ASSERT_TRUE(SHEEP_STATE.saveToFile());
+  ASSERT_TRUE(HABIT_TIMER.saveToFile());
+  Storage.ensureDirectoryExists("/.crosspoint/habit_events");
+  Storage.files["/.crosspoint/habit_events/2024-01-01.jsonl"] = "history";
+  Storage.files["/.crosspoint/settings.json"] = "protected";
+  const auto old = Storage.files;
+  Storage.capture = true;
+  ASSERT_TRUE(resetHabits());
+  Storage.capture = false;
+  const auto checkpoints = Storage.checkpoints;
+  for (const auto& checkpoint : checkpoints) {
+    Storage = {};
+    Storage.files = checkpoint;
+    const bool committed = Storage.exists("/.crosspoint/habit_reset_committed");
+    ASSERT_TRUE(recoverHabitReset());
+    EXPECT_FALSE(habitResetPending());
+    EXPECT_EQ(Storage.files["/.crosspoint/settings.json"], "protected");
+    if (committed || (!Storage.exists("/.crosspoint/habit_reset_pending") &&
+                      Storage.files[HabitSheepStore::getFilePath()] != old.at(HabitSheepStore::getFilePath()))) {
+      JsonDocument doc;
+      ASSERT_FALSE(deserializeJson(doc, Storage.files[HabitSheepStore::getFilePath()]));
+      EXPECT_EQ(doc["habits"].size(), 2);
+      EXPECT_FALSE(Storage.exists("/.crosspoint/habit_events/2024-01-01.jsonl"));
+    } else
+      for (const auto& item : old) EXPECT_EQ(Storage.files[item.first], item.second);
+  }
+}
+TEST_F(HabitSheepTest, EverySingleStorageFailureCanBeRecoveredWithoutTouchingOtherFiles) {
+  ASSERT_TRUE(HABIT_SHEEP.saveToFile());
+  ASSERT_TRUE(SHEEP_STATE.saveToFile());
+  ASSERT_TRUE(HABIT_TIMER.saveToFile());
+  Storage.ensureDirectoryExists("/.crosspoint/habit_events");
+  Storage.files["/.crosspoint/habit_events/old.jsonl"] = "old";
+  Storage.files["/books/book.epub"] = "protected";
+  const auto original = Storage.files;
+  for (int failure = 1; failure < 40; ++failure) {
+    Storage = {};
+    Storage.files = original;
+    Storage.failAt = failure;
+    resetHabits();
+    Storage.failAt = 0;
+    ASSERT_TRUE(recoverHabitReset());
+    EXPECT_EQ(Storage.files["/books/book.epub"], "protected");
+    EXPECT_FALSE(habitResetPending());
+  }
+}
+TEST_F(HabitSheepTest, InvalidResetJournalFailsClosedWithoutDeletingAnything) {
+  Storage.files["/.crosspoint/habit_reset_pending"] = "invalid";
+  Storage.files["/.crosspoint/settings.json"] = "protected";
+  const auto original = Storage.files;
+  EXPECT_FALSE(recoverHabitReset());
+  EXPECT_TRUE(habitResetPending());
+  EXPECT_EQ(Storage.files, original);
+  EXPECT_FALSE(HABIT_EVENTS.appendCompletion("completion"));
+  Storage.files.erase("/.crosspoint/habit_reset_pending");
+  EXPECT_TRUE(recoverHabitReset());
 }

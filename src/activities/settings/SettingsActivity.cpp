@@ -126,7 +126,7 @@ void SettingsActivity::rebuildSettingsLists() {
   readerSettings.insert(readerSettings.begin() + 1,
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
-  habitSheepSettings.reserve(8);
+  habitSheepSettings.reserve(9);
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_MODE, SettingAction::HabitMode));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_WEEK_START, SettingAction::HabitWeekStart));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_ORIENTATION, SettingAction::HabitOrientation));
@@ -135,6 +135,7 @@ void SettingsActivity::rebuildSettingsLists() {
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_RESET, SettingAction::HabitReset));
   habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_GRASS_HISTORY, SettingAction::GrassHistory));
 
   // Update currentSettings pointer and count for the active category
@@ -306,6 +307,13 @@ void SettingsActivity::toggleCurrentSetting() {
   }
 
   const auto& setting = (*currentSettings)[selectedSetting];
+  optionPopup.setHabitStyle(selectedCategoryIndex == 4);
+  if (selectedCategoryIndex == 4 && habitResetPending() && setting.action != SettingAction::HabitReset) {
+    const char* options[] = {tr(STR_BACK)};
+    optionPopup.show(tr(STR_HABIT_RESET), tr(STR_HABIT_RESET_FAILURE), options, 1, 0, [this](int) { requestUpdate(); });
+    requestUpdate();
+    return;
+  }
   const bool sleepScreenChanged = setting.valuePtr == &CrossPointSettings::sleepScreen;
   const bool quickResumeTimeoutChanged = setting.valuePtr == &CrossPointSettings::quickResumeSleepScreen;
 
@@ -370,6 +378,11 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
+      case SettingAction::HabitReset: {
+        resetConfirmation.begin();
+        showHabitReset();
+        break;
+      }
       case SettingAction::HabitMode: {
         const char* options[] = {tr(STR_STATE_OFF), tr(STR_STATE_ON)};
         optionPopup.show(tr(STR_HABIT_MODE), tr(STR_HABIT_PAUSE_HELP), options, 2, HABIT_SHEEP.isEnabled() ? 1 : 0,
@@ -746,4 +759,26 @@ void SettingsActivity::drawFooter() {
 void SettingsActivity::render(RenderLock&& lock) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
   UiListActivity::render(std::move(lock));
+}
+
+void SettingsActivity::showHabitReset() {
+  const bool second = resetConfirmation.second();
+  const char* options[] = {tr(STR_CANCEL), second ? tr(STR_HABIT_RESET_DELETE) : tr(STR_HABIT_RESET_CONTINUE)};
+  optionPopup.show(tr(STR_HABIT_RESET), second ? tr(STR_HABIT_RESET_CONFIRM) : tr(STR_HABIT_RESET_WARNING), options, 2,
+                   0, [this](int index) {
+                     if (resetConfirmation.choose(index == 1)) {
+                       const bool ok = resetHabits();
+                       if (habitResetPending()) HABIT_SHEEP.blockForResetRecovery();
+                       rebuildSettingsLists();
+                       const char* done[] = {tr(STR_BACK)};
+                       optionPopup.show(tr(STR_HABIT_RESET),
+                                        ok ? tr(STR_HABIT_RESET_DONE) : tr(STR_HABIT_RESET_FAILURE), done, 1, 0,
+                                        [this](int) { requestUpdate(); });
+                     } else if (resetConfirmation.second()) {
+                       showHabitReset();
+                     }
+                     requestUpdate();
+                   });
+  optionPopup.setHeadlineLines(8);
+  requestUpdate();
 }

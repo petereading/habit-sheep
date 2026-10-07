@@ -12,6 +12,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "HabitReset.h"
 #include "HabitSheepStore.h"
 #include "SheepStateStore.h"
 
@@ -337,6 +338,7 @@ uint32_t HabitEventLog::durationSecondsForPeriod(const HabitDefinition& habit, c
 
 bool HabitEventLog::appendEvent(const std::string& habitId, const char* type, const uint32_t amount, const char* unit,
                                 const HabitEventSource source, const char* dayOverride) {
+  if (habitResetPending()) return false;
   if (!HABIT_SHEEP.isEnabled() || habitId.empty() || !type || !unit) return false;
 
   std::string today;
@@ -477,4 +479,12 @@ bool HabitEventLog::takeReward(RewardNotice& notice, const std::string* habitId)
     return true;
   }
   return false;
+}
+
+void HabitEventLog::clearCacheAfterReset() {
+  cachedDay.clear();
+  cachedWeekStart = 255;
+  cachedProgress.clear();
+  cachedWeekCounts.clear();
+  pendingRewards = {};
 }

@@ -42,8 +42,10 @@ class SheepPuzzle {
     if (done) return;
     if (mode == Mode::TurnSheep && index < 9) {
       previousTurned = turnedAway;
+      previousSolution = solution;
       hasUndo = true;
       turnedAway ^= turnMask(index);
+      solution ^= 1U << index;
       done = turnedAway == 0;
     } else if (mode == Mode::Remember && index < 4) {
       if (preview)
@@ -62,12 +64,18 @@ class SheepPuzzle {
   void undo() {
     if (mode != Mode::TurnSheep || !hasUndo || done) return;
     turnedAway = previousTurned;
+    solution = previousSolution;
     hasUndo = false;
   }
   bool canUndo() const { return hasUndo; }
   bool backFacing(uint8_t index) const { return index < 9 && (turnedAway & (1U << index)); }
   uint16_t turnState() const { return turnedAway; }
   uint16_t solvingPresses() const { return solution; }
+  uint8_t hintIndex() const {
+    for (uint8_t i = 0; i < 9; ++i)
+      if (solution & (1U << i)) return i;
+    return 255;
+  }
   static uint16_t turnMask(uint8_t index) {
     if (index >= 9) return 0;
     uint16_t mask = 1U << index;
@@ -97,7 +105,7 @@ class SheepPuzzle {
   std::array<uint8_t, MAZE_CELLS> walls{};
   Mode mode = Mode::TurnSheep;
   uint32_t randomState = 1;
-  uint16_t turnedAway = 0, previousTurned = 0, solution = 0;
+  uint16_t turnedAway = 0, previousTurned = 0, solution = 0, previousSolution = 0;
   uint8_t answer = 0, target = 0, position = 0;
   bool preview = false, done = false, wrong = false, hasUndo = false;
   uint32_t random() {

@@ -9,6 +9,7 @@
 
 #include "HabitDayTime.h"
 #include "HabitEventLog.h"
+#include "HabitReset.h"
 #include "HabitSheepStore.h"
 
 int64_t HabitTimer::currentEpoch() {
@@ -191,6 +192,7 @@ bool HabitTimer::skipBreak(const std::string& id) {
 }
 
 void HabitTimer::tick() {
+  if (habitResetPending()) return;
   if (!HABIT_SHEEP.isEnabled()) return;
   for (auto& session : sessions) {
     if (session.habitId.empty()) continue;
@@ -310,4 +312,11 @@ bool HabitTimer::pauseAll() {
   running->accumulatedMs = previousMs;
   running->running = true;
   return false;
+}
+
+bool HabitTimer::writeDefaults(const char* path) {
+  JsonDocument doc;
+  doc["schema"] = 2;
+  doc["sessions"].to<JsonArray>();
+  return writeDocToFile(path, doc);
 }

@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <ctime>
 
+#include "HabitReset.h"
 #include "HabitSheepStore.h"
 
 namespace {
@@ -119,6 +120,7 @@ SheepStateStore::GrassDay SheepStateStore::grassForDay(const uint32_t day) const
 }
 
 bool SheepStateStore::syncPause() {
+  if (habitResetPending()) return false;
   const auto previous = snapshot();
   tm local{};
   if (!halClock.isAvailable() || !halClock.localTime(local)) {
@@ -143,6 +145,7 @@ bool SheepStateStore::syncPause() {
 }
 
 bool SheepStateStore::settleDay() {
+  if (habitResetPending()) return false;
   tm local{};
   if (!halClock.isAvailable() || !halClock.localTime(local)) return false;
   const uint32_t today = dayKey(local);
@@ -195,6 +198,7 @@ bool SheepStateStore::settleDay() {
 }
 
 void SheepStateStore::recordInteraction() {
+  if (habitResetPending()) return;
   if (!HABIT_SHEEP.isEnabled() || isForaging()) return;
   uint32_t today = 0;
   if (!currentDay(today) || today == lastInteractionDay) return;
@@ -205,6 +209,7 @@ void SheepStateStore::recordInteraction() {
 }
 
 uint8_t SheepStateStore::addGrass(const uint8_t amount, const char* eventDay) {
+  if (habitResetPending()) return 0;
   if (!HABIT_SHEEP.isEnabled()) return 0;
   settleDay();
   const uint8_t earned = std::min<uint8_t>(amount, GRASS_CAP - grassStock);
@@ -274,4 +279,12 @@ void SheepStateStore::markPausedDays(const tm& local) {
       entryForDay(key).paused = true;
     }
   }
+}
+
+bool SheepStateStore::writeDefaults(const char* path) {
+  static_assert(sizeof(SheepStateStore) < 256);
+  SheepStateStore fresh;
+  JsonDocument doc;
+  fresh.toJson(doc);
+  return writeDocToFile(path, doc);
 }

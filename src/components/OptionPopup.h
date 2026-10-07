@@ -32,8 +32,9 @@
 class OptionPopup {
  public:
   void setHabitStyle(bool value = true) { habitStyle = value; }
+  void setHeadlineLines(uint8_t lines) { headlineLines = std::clamp<uint8_t>(lines, 3, 10); }
   void showGames(const char* sheepName, std::function<void(int)> callback) {
-    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_TURN), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_MAZE)};
+    const char* options[] = {tr(STR_SHEEP_PAIRS), tr(STR_SHEEP_TURN), tr(STR_SHEEP_REMEMBER), tr(STR_SHEEP_DOKU)};
     show(tr(STR_SHEEP_PLAY_WITH), options, 4, 0, std::move(callback));
     title += " ";
     title += sheepName && *sheepName ? sheepName : tr(STR_SHEEP_DEFAULT_NAME);
@@ -270,9 +271,10 @@ class OptionPopup {
     // Captions like "Remove from Recent Books?" overflow the narrow portrait
     // dialog in one line; let them wrap and the panel grow.
     props.titleText.maxLines = 2;
-    props.headlineText.font = fui::GfxRendererTarget::FONT_BODY;
+    props.headlineText.font =
+        headlineLines > 3 ? fui::GfxRendererTarget::FONT_SMALL : fui::GfxRendererTarget::FONT_BODY;
     props.headlineText.align = fui::TextAlign::Center;
-    props.headlineText.maxLines = 3;
+    props.headlineText.maxLines = headlineLines;
     props.messageText = props.headlineText;
     props.buttonText.font = fui::GfxRendererTarget::FONT_BODY;
     const int16_t innerPadding = static_cast<int16_t>(metrics.optionPopupInnerPadding);
@@ -390,6 +392,7 @@ class OptionPopup {
   static constexpr freeink::ui::ActionId ACTION_PAGE = 3;
 
   void activate(int currentIndex, std::function<void(int)> onSelect) {
+    headlineLines = 3;
     grassBadge = false;
     iconMenu = false;
     minuteMenu = false;
@@ -412,6 +415,7 @@ class OptionPopup {
   char rewardText[80]{};
   std::string title;
   std::string headline;
+  uint8_t headlineLines = 3;
   std::vector<std::string> ownedStrings;
   int selectedIndex = 0;
   std::function<void(int)> onSelectCallback;

@@ -9,6 +9,7 @@ add_executable(HabitSheepTest
   ${REPO_ROOT}/src/HabitSheepStore.cpp
   ${REPO_ROOT}/src/SheepStateStore.cpp
   ${REPO_ROOT}/src/HabitEventLog.cpp
+  ${REPO_ROOT}/src/HabitReset.cpp
   ${REPO_ROOT}/src/HabitTimer.cpp
 )
 target_include_directories(HabitSheepTest PRIVATE stubs ${REPO_ROOT}/src)

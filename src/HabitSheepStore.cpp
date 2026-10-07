@@ -7,6 +7,7 @@
 #include <string_view>
 #include <utility>
 
+#include "HabitReset.h"
 #include "HabitTimer.h"
 #include "SheepStateStore.h"
 
@@ -272,4 +273,12 @@ bool HabitSheepStore::clearPausedSleepScreen() {
   if (saveToFile()) return true;
   pausedSleepScreen = previous;
   return false;
+}
+
+bool HabitSheepStore::writeDefaults(const char* path) {
+  static_assert(sizeof(HabitSheepStore) < 256);
+  HabitSheepStore fresh;
+  JsonDocument doc;
+  fresh.toJson(doc);
+  return writeDocToFile(path, doc);
 }

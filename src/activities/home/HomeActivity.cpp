@@ -34,6 +34,7 @@
 #include "activities/habits/HabitDurationActivity.h"
 #include "activities/habits/SheepMemoryActivity.h"
 #include "activities/habits/SheepPuzzleActivity.h"
+#include "activities/habits/SheepSudokuActivity.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/HabitReward.h"
 #include "components/UITheme.h"
@@ -453,6 +454,12 @@ void HomeActivity::showSheepGames() {
         activityManager.pushActivity(std::move(game));
       else
         LOG_ERR("HABIT", "OOM: Pairs");
+    } else if (selected == 3) {
+      auto game = makeUniqueNoThrow<SheepSudokuActivity>(renderer, mappedInput);
+      if (game)
+        activityManager.pushActivity(std::move(game));
+      else
+        LOG_ERR("HABIT", "OOM: Sheep-doku");
     } else {
       auto game =
           makeUniqueNoThrow<SheepPuzzleActivity>(renderer, mappedInput, static_cast<SheepPuzzle::Mode>(selected - 1));
