@@ -1077,7 +1077,9 @@ TEST(SheepSudokuTest, GeneratedBoardsAreUniqueAndAllHintsCompleteAcrossSeeds) {
     EXPECT_EQ(SheepSudoku::countSolutions(game.givens()), 1);
     EXPECT_FALSE(game.complete());
     for (int i = 0; i < 16; ++i) {
-      if (game.fixed(i)) EXPECT_FALSE(game.set(i, 0));
+      if (game.fixed(i)) {
+        EXPECT_FALSE(game.set(i, 0));
+      }
     }
     for (int n = 0; n < 16 && !game.complete(); ++n) {
       const auto at = game.hintCell();
