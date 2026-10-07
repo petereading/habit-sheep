@@ -178,6 +178,10 @@ Add a Reset Habits option inside Settings → Habits, with two separate confirma
 
 Confirmed scope: delete all Habits history, including aggregate earned/eaten grass history and each habit’s records/statistics, and restore grass stock and mood to first-install state (nine grass, five hearts). Reset the Habits-owned care/progress/timer bookkeeping consistently to its initial state so deleted events, pending rewards or unfinished sessions cannot recreate the cleared records. Restore other Habits-owned configuration to defaults as requested; clearly list habit definitions/active slots and sheep-name handling in the confirmation summary before implementation. CrossPoint book progress and settings must remain intact. A fresh care state is nine grass and five hearts, so resetting to defaults alone would not quickly expose the zero-mood foraging scene. A separate temporary scene preview/test aid may be proposed for that purpose; it is not yet approved. Keep this entry pending; no reset code, build or test is authorized by the request to record this item.
 
+## X3 build requested — 2026-10-07
+
+The user requested an X3 binary from the completed Sheep Turn/menu/maze-wall, five-second interaction and day/night-rest source batch. Local rebuilt tests pass 429/429. This checkpoint starts one CI build; final CI results and binary provenance belong to PR #1. Reset Habits (P-050), release-name presentation updates and the scene-preview idea are not implemented in this build. PR remains draft.
+
 ## Validation for the 2026-10-06 batch
 
 - Local unit/regression tests: 429 passed, including midnight/resume/restart, long-break Skip/save failure, daily and configured weekly totals, fresh defaults and Home focus persistence. Each random-game generator was tested across 500 seeds.
