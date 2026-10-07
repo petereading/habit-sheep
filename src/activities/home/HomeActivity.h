@@ -6,14 +6,23 @@
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "components/CoverGridHomeUi.h"
+#include "components/HabitClock.h"
+#include "components/HabitSheepHomeUi.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 struct Rect;
 
 class HomeActivity final : public Activity {
   std::unique_ptr<CoverGridHomeUi> coverGridUi;
+  std::unique_ptr<HabitSheepHomeUi> habitSheepUi;
+  OptionPopup habitReplacementPopup;
+  std::vector<std::string> habitReplacementIds;
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
+  uint32_t lastHabitProgressStamp = UINT32_MAX;
+  HabitClock habitClock;
+  uint32_t lastHabitModeRevision = UINT32_MAX;
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;
@@ -75,6 +84,10 @@ class HomeActivity final : public Activity {
   void fillCoverGridFromLibrary();
   void resolveGridCoverPaths();
   void loadGridCover(RecentBook& book, int height, bool& showingLoading, Rect& popupRect);
+  void loopHabitSheepHome();
+  void activateHabitSheepSelection();
+  void showHabitReplacementPicker(int slot);
+  void showSheepGames();
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -87,4 +100,5 @@ class HomeActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
   bool isHomeActivity() const override { return true; }
+  bool preventAutoSleep() override;
 };

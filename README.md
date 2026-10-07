@@ -1,3 +1,23 @@
+# CrossPoint Sheep
+
+CrossPoint Sheep is an e-ink habit companion and virtual sheep built as a thin fork of CrossPoint Reader.
+
+The project keeps CrossPoint's reading features intact while adding a low-friction Home experience centred on a persistent sheep companion and up to three currently active habits. Users can save up to nine habits and swap which three are active for weekdays, weekends, holidays, or other routines.
+
+CrossPoint Sheep is designed around positive reinforcement: completed focus sessions, timed sessions and counts earn grass, while interacting with the sheep builds familiarity. The sheep eats three times daily, rests after missed meals and goes foraging at zero mood; it never dies. Pause Habits during busy periods. Reading remains optional; CrossPoint's reading shortcuts stay available without turning reading into an obligation.
+
+The V1 public-test candidate includes Pairs, Sheep Turn with hints, Remember sheep and randomly generated 4×4 Sheep-doku. Settings → Habits → Reset Habits requires two confirmations and resets only habit settings/history/care, preserving books and CrossPoint settings.
+
+Development is currently on the `feature/habit-sheep-v1` branch. See `docs/HABIT_SHEEP_V1.md` for the current V1 product/architecture specification and `docs/UPSTREAM_POLICY.md` for the one-way CrossPoint sync policy.
+
+See [the public test guide](docs/CROSSPOINT_SHEEP_PUBLIC_TEST.md) for Reset, games and X3 checks. This is a test candidate; PR #1 remains draft.
+
+---
+
+## CrossPoint Reader upstream
+
+CrossPoint Sheep is based on the open-source CrossPoint Reader project. The upstream README is retained below for device support, reader features, setup information, and project credits.
+
 # CrossPoint Reader
 
 [![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/crosspoint-reader/crosspoint-reader)

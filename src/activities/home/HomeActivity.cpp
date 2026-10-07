@@ -12,16 +12,31 @@
 #include <Memory.h>
 #include <Utf8.h>
 #include <Xtc.h>
+#include <esp_system.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HabitEventLog.h"
+#include "HabitSheepStore.h"
+#include "HabitTimer.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
+#include "SheepScene.h"
+#include "SheepStateStore.h"
+#include "activities/habits/GrassHistoryActivity.h"
+#include "activities/habits/HabitCountActivity.h"
+#include "activities/habits/HabitDurationActivity.h"
+#include "activities/habits/SheepMemoryActivity.h"
+#include "activities/habits/SheepPuzzleActivity.h"
+#include "activities/habits/SheepSudokuActivity.h"
+#include "activities/reader/ReaderUtils.h"
+#include "components/HabitReward.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -226,11 +241,33 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 }
 
 void HomeActivity::onEnter() {
+  ReaderUtils::applyOrientation(renderer, HABIT_SHEEP.getOrientation());
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();
 
   const auto& metrics = UITheme::getInstance().getMetrics();
+
+  // Habit Sheep is the default home for this fork. Keep it as a screen-lifetime
+  // component owned by HomeActivity so ActivityManager and upstream Home
+  // semantics stay unchanged. Fall back to the upstream home on allocation failure.
+  habitSheepUi = makeUniqueNoThrow<HabitSheepHomeUi>(renderer);
+  if (habitSheepUi) {
+    habitReplacementPopup.setHabitStyle();
+    loadRecentBooks(1);
+    hasContinueReading = !recentBooks.empty();
+    if (!HABIT_SHEEP.isEnabled())
+      loadRecentCovers(std::min(260, static_cast<int>(renderer.getScreenHeight()) - 74 - 52 - 110));
+    HABIT_EVENTS.refreshToday();
+    SHEEP_STATE.settleDay();
+    lastHabitProgressStamp = UINT32_MAX;
+    lastHabitModeRevision = HABIT_SHEEP.getModeRevision();
+    selectorIndex = mappedInput.hasTouch() ? 0 : HABIT_SHEEP.homeSelection(hasContinueReading);
+    requestUpdate();
+    return;
+  }
+  LOG_ERR("HABIT", "OOM: Habit Sheep home; using upstream home");
+
   if (UITheme::getInstance().hasCoverGridHome()) {
     // Screen-lifetime interaction tables and component properties exceed the stack budget.
     coverGridUi = makeUniqueNoThrow<CoverGridHomeUi>(renderer);
@@ -254,6 +291,7 @@ void HomeActivity::onEnter() {
 void HomeActivity::onExit() {
   Activity::onExit();
 
+  habitSheepUi.reset();
   coverGridUi.reset();
 
   // Free the stored cover buffer if any
@@ -296,7 +334,230 @@ void HomeActivity::freeCoverBuffer() {
   coverBufferStored = false;
 }
 
+void HomeActivity::showHabitReplacementPicker(const int slot) {
+  if (slot < 0 || slot >= static_cast<int>(HabitSheepStore::MAX_ACTIVE_HABITS)) return;
+
+  std::vector<std::string> labels;
+  habitReplacementIds.clear();
+  labels.emplace_back("Empty slot");
+  habitReplacementIds.emplace_back("");
+
+  const auto& active = HABIT_SHEEP.getActiveHabitIds();
+  for (const auto& habit : HABIT_SHEEP.getHabits()) {
+    const bool usedElsewhere = std::any_of(active.begin(), active.end(),
+                                           [&](const std::string& id) { return id == habit.id && id != active[slot]; });
+    if (usedElsewhere) continue;
+    labels.push_back(habit.name);
+    habitReplacementIds.push_back(habit.id);
+  }
+
+  const auto currentIt = std::find(habitReplacementIds.begin() + 1, habitReplacementIds.end(), active[slot]);
+  const int current = currentIt == habitReplacementIds.end()
+                          ? 0
+                          : static_cast<int>(std::distance(habitReplacementIds.begin(), currentIt));
+
+  std::vector<const char*> options(labels.size());
+  std::transform(labels.begin(), labels.end(), options.begin(), [](const std::string& label) { return label.c_str(); });
+  habitReplacementPopup.show("Active habit", options.data(), static_cast<int>(options.size()), current,
+                             [this, slot](const int selected) {
+                               if (selected < 0 || selected >= static_cast<int>(habitReplacementIds.size())) return;
+                               HABIT_SHEEP.setActiveHabit(slot, habitReplacementIds[selected]);
+                               if (habitReplacementIds[selected].empty()) selectorIndex = 0;
+                               requestUpdate();
+                             });
+  requestUpdate();
+}
+
+void HomeActivity::activateHabitSheepSelection() {
+  if (!habitSheepUi) return;
+
+  const auto action = habitSheepUi->actionForSelection(selectorIndex);
+  switch (action) {
+    case HabitSheepHomeUi::Action::Sheep:
+      if (!HABIT_SHEEP.isEnabled()) {
+        if (hasContinueReading && !recentBooks.empty())
+          onSelectBook(recentBooks[0].path);
+        else
+          onFileBrowserOpen();
+      } else if (!SHEEP_STATE.isForaging()) {
+        SHEEP_STATE.recordInteraction();
+        habitSheepUi->nudgeSheep(static_cast<uint8_t>(esp_random() % 4));
+        requestUpdate();
+      }
+      break;
+    case HabitSheepHomeUi::Action::Habit1:
+    case HabitSheepHomeUi::Action::Habit2:
+    case HabitSheepHomeUi::Action::Habit3: {
+      const int slot = static_cast<int>(action) - static_cast<int>(HabitSheepHomeUi::Action::Habit1);
+      const auto& active = HABIT_SHEEP.getActiveHabitIds();
+      if (slot < 0 || slot >= static_cast<int>(active.size())) break;
+      if (active[slot].empty()) {
+        showHabitReplacementPicker(slot);
+        break;
+      }
+      const HabitDefinition* habit = HABIT_SHEEP.findHabit(active[slot]);
+      if (!habit) break;
+
+      if (habit->type == HabitType::Completion) {
+        auto detail = makeUniqueNoThrow<HabitCountActivity>(renderer, mappedInput, habit->id);
+        if (detail) activityManager.pushActivity(std::move(detail));
+      } else {
+        auto detail = makeUniqueNoThrow<HabitDurationActivity>(renderer, mappedInput, habit->id);
+        if (detail) activityManager.pushActivity(std::move(detail));
+      }
+      break;
+    }
+    case HabitSheepHomeUi::Action::ContinueReading:
+      if (hasContinueReading && !recentBooks.empty()) {
+        onSelectBook(recentBooks[0].path);
+      } else {
+        onFileBrowserOpen();
+      }
+      break;
+    case HabitSheepHomeUi::Action::BrowseFiles:
+      onFileBrowserOpen();
+      break;
+    case HabitSheepHomeUi::Action::Library:
+      onLibraryOpen();
+      break;
+    case HabitSheepHomeUi::Action::Opds:
+      onOpdsBrowserOpen();
+      break;
+    case HabitSheepHomeUi::Action::Transfer:
+      onFileTransferOpen();
+      break;
+    case HabitSheepHomeUi::Action::Settings: {
+      activityManager.goToSettings(4);
+      break;
+    }
+    case HabitSheepHomeUi::Action::GrassHistory: {
+      auto history = makeUniqueNoThrow<GrassHistoryActivity>(renderer, mappedInput);
+      if (history) activityManager.pushActivity(std::move(history));
+      break;
+    }
+    case HabitSheepHomeUi::Action::None:
+      break;
+  }
+}
+
+bool HomeActivity::preventAutoSleep() {
+  if (!habitSheepUi || !HABIT_SHEEP.isEnabled()) return false;
+  tm local{};
+  return habitSheepUi->isInteracting() || (halClock.localTime(local) && SHEEP_STATE.ateCurrentMeal(local));
+}
+
+void HomeActivity::showSheepGames() {
+  habitReplacementPopup.showGames(HABIT_SHEEP.getSheepName().c_str(), [this](int selected) {
+    if (selected == 0) {
+      auto game = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
+      if (game)
+        activityManager.pushActivity(std::move(game));
+      else
+        LOG_ERR("HABIT", "OOM: Pairs");
+    } else if (selected == 3) {
+      auto game = makeUniqueNoThrow<SheepSudokuActivity>(renderer, mappedInput);
+      if (game)
+        activityManager.pushActivity(std::move(game));
+      else
+        LOG_ERR("HABIT", "OOM: Sheep-doku");
+    } else {
+      auto game =
+          makeUniqueNoThrow<SheepPuzzleActivity>(renderer, mappedInput, static_cast<SheepPuzzle::Mode>(selected - 1));
+      if (game)
+        activityManager.pushActivity(std::move(game));
+      else
+        LOG_ERR("HABIT", "OOM: sheep puzzle");
+    }
+  });
+  requestUpdate();
+}
+
+void HomeActivity::loopHabitSheepHome() {
+  if (!habitSheepUi) return;
+  RenderLock lock;
+  if (habitSheepUi->expireNudge()) requestUpdate();
+  if (lastHabitModeRevision != HABIT_SHEEP.getModeRevision()) {
+    lastHabitModeRevision = HABIT_SHEEP.getModeRevision();
+    if (!HABIT_SHEEP.isEnabled()) {
+      loadRecentBooks(1);
+      hasContinueReading = !recentBooks.empty();
+      loadRecentCovers(std::min(260, static_cast<int>(renderer.getScreenHeight()) - 74 - 52 - 110));
+    }
+    selectorIndex = mappedInput.hasTouch() ? 0 : HABIT_SHEEP.homeSelection(hasContinueReading);
+    requestUpdate();
+  }
+  const bool mealChanged = SHEEP_STATE.settleDay();
+  const bool clockChanged = habitClock.changed();
+  if (mealChanged || clockChanged) requestUpdate();
+
+  uint32_t progressStamp = 0;
+  for (const auto& id : HABIT_SHEEP.getActiveHabitIds()) {
+    if (id.empty()) continue;
+    progressStamp = progressStamp * 31 + HABIT_TIMER.elapsedSecondsFor(id) / 60;
+    progressStamp = progressStamp * 31 + static_cast<uint8_t>(HABIT_TIMER.phaseFor(id));
+  }
+  if (progressStamp != lastHabitProgressStamp) {
+    lastHabitProgressStamp = progressStamp;
+    requestUpdate();
+  }
+
+  if (habitReplacementPopup.isActive()) {
+    habitReplacementPopup.handleInput(mappedInput, [this] { requestUpdate(); });
+    return;
+  }
+
+  if (HABIT_SHEEP.isEnabled() && showHabitReward(habitReplacementPopup)) {
+    requestUpdate();
+    return;
+  }
+
+  const int longPressedSlot = habitSheepUi->longPressedHabit(mappedInput);
+  if (longPressedSlot == 3) {
+    selectorIndex = 0;
+    showSheepGames();
+    return;
+  }
+  if (longPressedSlot >= 0) {
+    showHabitReplacementPicker(longPressedSlot);
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Up) ||
+      mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    selectorIndex = habitSheepUi->previousSelection(selectorIndex);
+    requestUpdate();
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Down) ||
+      mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+    selectorIndex = habitSheepUi->nextSelection(selectorIndex);
+    requestUpdate();
+    return;
+  }
+
+  // Preserve CrossPoint's Home shortcut: Back resumes the most recent book.
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) && hasContinueReading && !recentBooks.empty()) {
+    onSelectBook(recentBooks[0].path);
+    return;
+  }
+
+  const int touched = habitSheepUi->selectedAction(mappedInput);
+  if (touched >= 0) {
+    selectorIndex = touched;
+    activateHabitSheepSelection();
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    activateHabitSheepSelection();
+  }
+}
+
 void HomeActivity::loop() {
+  if (habitSheepUi) {
+    loopHabitSheepHome();
+    return;
+  }
   const int menuCount = getMenuItemCount();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
@@ -450,6 +711,17 @@ void HomeActivity::loop() {
 }
 
 void HomeActivity::render(RenderLock&&) {
+  if (habitSheepUi) {
+    renderer.clearScreen();
+    habitSheepUi->setSelection(selectorIndex);
+    habitSheepUi->renderUi(HABIT_SHEEP, !habitReplacementPopup.isActive(),
+                           recentBooks.empty() ? nullptr : &recentBooks[0]);
+    if (habitReplacementPopup.processRender(renderer, mappedInput)) return;
+    renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH
+                                                                   : HalDisplay::FAST_REFRESH);
+    firstRenderDone = true;
+    return;
+  }
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();

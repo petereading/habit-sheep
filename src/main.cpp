@@ -20,19 +20,26 @@
 #include <WiFi.h>
 #include <XteinkDetect.h>
 #include <builtinFonts/all.h>
+#include <esp_sleep.h>
 
 #include <cstring>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "HabitReset.h"
+#include "HabitSheepStore.h"
+#include "HabitTimer.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
+#include "SheepScene.h"
+#include "SheepStateStore.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
+#include "components/HabitSheepHomeUi.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "platform/UsbSerialJtagHandoff.h"
@@ -258,6 +265,18 @@ static bool loadSleepFrameBuffer() {
   return true;
 }
 
+// The X3 keeps its CPU RTC domain powered while GPIO13 gates the SD rail.
+void armSheepSleepRefresh(bool allowed = true) {
+  esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+  tm local{};
+  if (allowed && gpio.deviceIsX3() && HABIT_SHEEP.isEnabled() &&
+      SETTINGS.sleepScreen == CrossPointSettings::HABIT_SHEEP_SCENE && halClock.localTime(local)) {
+    const uint32_t seconds = sheepScene::sleepSeconds(local);
+    const esp_err_t error = esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(seconds) * 1000000ULL);
+    if (error != ESP_OK) LOG_ERR("HABIT", "Cannot arm sleep refresh: %d", static_cast<int>(error));
+  }
+}
+
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
@@ -292,6 +311,7 @@ void enterDeepSleep(bool fromTimeout = false) {
     WiFi.mode(WIFI_OFF);
   }
 
+  armSheepSleepRefresh(!isQuickResumeSleep);
   halTiltSensor.deepSleep();
   display.deepSleep();
   Storage.prepareForDeepSleep();
@@ -434,11 +454,42 @@ void setup() {
   // UTC-offset setting on first boot after the update).
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
+  const bool habitResetRecovered = recoverHabitReset();
+  if (!habitResetRecovered) LOG_ERR("HABIT", "Reset recovery needs a working SD card; habits paused");
+  HABIT_SHEEP.loadFromFile();
+  if (!SETTINGS.habitSheepSleepMigrated) {
+    if (HABIT_SHEEP.legacySleepSceneEnabled() && SETTINGS.sleepScreen != CrossPointSettings::QUICK_RESUME)
+      SETTINGS.sleepScreen = CrossPointSettings::HABIT_SHEEP_SCENE;
+    SETTINGS.habitSheepSleepMigrated = true;
+    if (!SETTINGS.saveToFile()) SETTINGS.habitSheepSleepMigrated = false;
+  }
+  HABIT_TIMER.loadFromFile();
+  SHEEP_STATE.loadFromFile();
+  if (!habitResetRecovered) HABIT_SHEEP.blockForResetRecovery();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
+
+  if (wakeupReason == HalGPIO::WakeupReason::Timer && gpio.deviceIsX3() && !gpio.rawInputActive()) {
+    setupDisplayAndFonts(true);
+    if (HABIT_SHEEP.isEnabled() && SETTINGS.sleepScreen == CrossPointSettings::HABIT_SHEEP_SCENE) {
+      SHEEP_STATE.settleDay();
+      {
+        RenderLock lock;
+        HabitSheepHomeUi sleepUi(renderer);
+        sleepUi.renderSleepUi(HABIT_SHEEP);
+        renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+      }
+    }
+    armSheepSleepRefresh();
+    halTiltSensor.deepSleep();
+    display.deepSleep();
+    Storage.prepareForDeepSleep();
+    powerManager.startDeepSleep(gpio);
+    return;
+  }
 
   // Brightness and warmth are always restored. A normal wake starts with the
   // light off unless Restore Light on Wake is enabled; silent maintenance
@@ -605,6 +656,16 @@ void loop() {
     return;
   }
 
+  {
+    RenderLock lock;
+    HABIT_TIMER.tick();
+    static unsigned long lastSheepCheckMs = 0;
+    if (millis() - lastSheepCheckMs >= 60000) {
+      lastSheepCheckMs = millis();
+      SHEEP_STATE.settleDay();
+    }
+  }
+
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 
   renderer.setFadingFix(SETTINGS.fadingFix);
@@ -719,7 +780,7 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
-  if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
+  if (sleepTimeoutMs > 0 && !activityManager.preventAutoSleep() && millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start

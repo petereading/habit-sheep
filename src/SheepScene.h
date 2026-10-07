@@ -1,0 +1,39 @@
+#pragma once
+
+#include <cstdint>
+#include <ctime>
+
+namespace sheepScene {
+inline uint8_t timerPose(const tm& local) { return (local.tm_hour * 12 + local.tm_min / 5) % 3; }
+inline bool mirrored(const tm& local, bool rest, bool eating) {
+  uint32_t value = static_cast<uint32_t>(local.tm_year * 366 + local.tm_yday) * 144U;
+  value += local.tm_hour * 6U + (eating ? 0U : local.tm_min / (rest ? 30U : 10U));
+  if (eating) value = value / 6U;
+  value ^= value << 13;
+  value ^= value >> 17;
+  value ^= value << 5;
+  return (value & 1U) != 0;
+}
+inline bool mealVisual(const tm& local) {
+  return (local.tm_hour == 8 || local.tm_hour == 13 || local.tm_hour == 19) && local.tm_min < 5;
+}
+
+inline uint8_t pose(const tm& local, bool sleepScreen, bool resting, bool eating) {
+  if (eating && mealVisual(local)) return 16 + (local.tm_min % 2);
+  if (sleepScreen || resting) {
+    if (local.tm_hour >= 7 && local.tm_hour < 22) return 12;
+    return 13 + ((local.tm_hour * 2 + local.tm_min / 30) % 3);
+  }
+  return (local.tm_hour * 6 + local.tm_min / 10) % 12;
+}
+
+inline uint32_t sleepSeconds(const tm& local) {
+  const uint32_t elapsed = local.tm_min * 60U + local.tm_sec;
+  uint32_t seconds = 1800 - elapsed % 1800;
+  if (mealVisual(local)) {
+    const uint32_t untilRest = 300 - elapsed;
+    if (untilRest < seconds) seconds = untilRest;
+  }
+  return seconds;
+}
+}  // namespace sheepScene

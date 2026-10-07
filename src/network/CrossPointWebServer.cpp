@@ -10,12 +10,17 @@
 #include <WiFi.h>
 #include <esp_efuse.h>
 #include <esp_efuse_table.h>
+#include <esp_random.h>
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstring>
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
+#include "HabitSheepMode.h"
+#include "HabitSheepStore.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
@@ -176,6 +181,8 @@ void CrossPointWebServer::begin() {
   server->on("/settings", HTTP_GET, [this] { handleSettingsPage(); });
   server->on("/api/settings", HTTP_GET, [this] { handleGetSettings(); });
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
+  server->on("/api/habit-sheep", HTTP_GET, [this] { handleGetHabitSheep(); });
+  server->on("/api/habit-sheep", HTTP_POST, [this] { handlePostHabitSheep(); });
 
   // Font management endpoints
   server->on("/fonts", HTTP_GET, [this] { handleFontsPage(); });
@@ -1298,6 +1305,8 @@ void CrossPointWebServer::handlePostSettings() {
         if (val >= 0 && val < maxVal) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+            if (s.valuePtr == &CrossPointSettings::sleepScreen && !HABIT_SHEEP.isEnabled())
+              HABIT_SHEEP.clearPausedSleepScreen();
           } else if (s.valueSetter) {
             s.valueSetter(static_cast<uint8_t>(val));
           }
@@ -1310,6 +1319,8 @@ void CrossPointWebServer::handlePostSettings() {
         if (val >= s.valueRange.min && val <= s.valueRange.max) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+            if (s.valuePtr == &CrossPointSettings::sleepScreen && !HABIT_SHEEP.isEnabled())
+              HABIT_SHEEP.clearPausedSleepScreen();
           }
           applied++;
         }
@@ -1336,6 +1347,94 @@ void CrossPointWebServer::handlePostSettings() {
 
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
   server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
+}
+
+void CrossPointWebServer::handleGetHabitSheep() const {
+  JsonDocument doc;
+  HABIT_SHEEP.toJson(doc);
+  String output;
+  serializeJson(doc, output);
+  server->send(200, "application/json", output);
+}
+
+void CrossPointWebServer::handlePostHabitSheep() {
+  if (!server->hasArg("plain") || server->arg("plain").length() > 1024) {
+    server->send(400, "text/plain", "Invalid JSON body");
+    return;
+  }
+  JsonDocument doc;
+  if (deserializeJson(doc, server->arg("plain"))) {
+    server->send(400, "text/plain", "Invalid JSON body");
+    return;
+  }
+
+  const char* action = doc["action"] | "";
+  bool valid = false;
+  if (strcmp(action, "saveHabit") == 0) {
+    const char* name = doc["name"] | "";
+    const char* type = doc["type"] | "";
+    const int minutes = doc["targetMinutes"] | 0;
+    const bool duration = strcmp(type, "duration") == 0;
+    const bool pomodoro = strcmp(type, "pomodoro") == 0;
+    const bool completion = strcmp(type, "completion") == 0;
+    const int shortBreak = doc["shortBreakMinutes"] | 5;
+    const int longBreak = doc["longBreakMinutes"] | 15;
+    const int sessions = doc["sessionsPerCycle"] | 4;
+    const int targetCount = doc["targetCount"] | 1;
+    const char* period = doc["period"] | "daily";
+    const char* requestedId = doc["id"] | "";
+    if (*name && strlen(name) <= HabitSheepStore::MAX_NAME_BYTES && (duration || pomodoro || completion) &&
+        (completion || (minutes > 0 && minutes <= 1440)) && targetCount > 0 && targetCount <= 99 &&
+        (strcmp(period, "daily") == 0 || strcmp(period, "weekly") == 0) &&
+        (!pomodoro || (shortBreak > 0 && shortBreak <= 120 && longBreak > 0 && longBreak <= 120 && sessions > 0 &&
+                       sessions <= 12)) &&
+        (!*requestedId || HABIT_SHEEP.findHabit(requestedId))) {
+      char newId[32];
+      const char* id = requestedId;
+      if (!*id) {
+        snprintf(newId, sizeof(newId), "h-%08lX-%08lX", static_cast<unsigned long>(esp_random()),
+                 static_cast<unsigned long>(esp_random()));
+        id = newId;
+      }
+      HabitDefinition habit;
+      habit.id = id;
+      habit.name = name;
+      habit.type = pomodoro ? HabitType::Pomodoro : duration ? HabitType::Duration : HabitType::Completion;
+      habit.targetMinutes = completion ? 0 : static_cast<uint16_t>(minutes);
+      habit.readingIntegration = duration && (doc["readingIntegration"] | false);
+      habit.shortBreakMinutes = static_cast<uint16_t>(shortBreak);
+      habit.longBreakMinutes = static_cast<uint16_t>(longBreak);
+      habit.sessionsPerCycle = static_cast<uint8_t>(sessions);
+      habit.period = strcmp(period, "weekly") == 0 ? HabitPeriod::Weekly : HabitPeriod::Daily;
+      habit.targetCount = static_cast<uint8_t>(targetCount);
+      const auto* existing = HABIT_SHEEP.findHabit(habit.id);
+      const int icon = doc["icon"] | (existing ? existing->icon : 255);
+      habit.icon = icon >= 0 && icon < 24 ? static_cast<uint8_t>(icon) : 255;
+      valid = HABIT_SHEEP.upsertHabit(habit);
+    }
+  } else if (strcmp(action, "deleteHabit") == 0) {
+    const char* id = doc["id"] | "";
+    if (*id) valid = HABIT_SHEEP.removeHabit(id);
+  } else if (strcmp(action, "setActive") == 0) {
+    const int slot = doc["slot"] | -1;
+    const char* id = doc["id"] | "";
+    if (slot >= 0 && slot < static_cast<int>(HabitSheepStore::MAX_ACTIVE_HABITS)) {
+      valid = HABIT_SHEEP.setActiveHabit(static_cast<size_t>(slot), id);
+    }
+  } else if (strcmp(action, "setEnabled") == 0) {
+    if (doc["enabled"].is<bool>()) valid = setHabitSheepEnabled(doc["enabled"].as<bool>());
+  } else if (strcmp(action, "setWeekStart") == 0) {
+    const int value = doc["weekStart"] | -1;
+    if (value >= 0 && value <= 6) valid = HABIT_SHEEP.setWeekStart(value);
+  } else if (strcmp(action, "setSheepName") == 0) {
+    const char* name = doc["name"] | "";
+    if (strlen(name) <= HabitSheepStore::MAX_NAME_BYTES) valid = HABIT_SHEEP.setSheepName(name);
+  } else if (strcmp(action, "setOrientation") == 0) {
+    const int value = doc["orientation"] | -1;
+    if (value >= 0 && value <= 3) valid = HABIT_SHEEP.setOrientation(value);
+  }
+
+  server->send(valid ? 200 : 400, "text/plain", valid ? "Saved" : "Invalid habit setting or save failed");
 }
 
 // ---- OPDS Server API ----

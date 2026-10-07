@@ -19,6 +19,8 @@
 #include "ClockSettingsActivity.h"
 #include "CrossPointSettings.h"
 #include "FontDownloadActivity.h"
+#include "HabitSheepMode.h"
+#include "HabitSheepStore.h"
 #include "HomeButtonSettingsActivity.h"
 #include "KOReaderSettingsActivity.h"
 #include "KeyboardLayoutsActivity.h"
@@ -29,11 +31,17 @@
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
+#include "SheepStateStore.h"
 #include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
+#include "activities/habits/ActiveHabitsActivity.h"
+#include "activities/habits/GrassHistoryActivity.h"
+#include "activities/habits/HabitLibraryActivity.h"
+#include "activities/habits/SheepMemoryActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
@@ -41,14 +49,16 @@
 
 namespace fui = freeink::ui;
 
-SettingsActivity::SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : UiTabListActivity("Settings", renderer, mappedInput) {}
+SettingsActivity::SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const int initialCategory)
+    : UiTabListActivity("Settings", renderer, mappedInput),
+      initialCategoryIndex(std::clamp(initialCategory, 0, categoryCount - 1)) {}
 
 void SettingsActivity::rebuildSettingsLists() {
   displaySettings.clear();
   readerSettings.clear();
   controlsSettings.clear();
   systemSettings.clear();
+  habitSheepSettings.clear();
 
   // Pick up any fonts uploaded/deleted over the web server since the last
   // reader activity ran — otherwise the font-family picker shows stale list.
@@ -116,6 +126,17 @@ void SettingsActivity::rebuildSettingsLists() {
   readerSettings.insert(readerSettings.begin() + 1,
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+  habitSheepSettings.reserve(9);
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_MODE, SettingAction::HabitMode));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_WEEK_START, SettingAction::HabitWeekStart));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_ORIENTATION, SettingAction::HabitOrientation));
+  if (!mappedInput.hasTouch())
+    habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_HOME_FOCUS, SettingAction::HabitHomeFocus));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_SHEEP_NAME, SettingAction::SheepName));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_ACTIVE_HABITS, SettingAction::ActiveHabits));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_LIBRARY, SettingAction::HabitLibrary));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_HABIT_RESET, SettingAction::HabitReset));
+  habitSheepSettings.push_back(SettingInfo::Action(StrId::STR_GRASS_HISTORY, SettingAction::GrassHistory));
 
   // Update currentSettings pointer and count for the active category
   switch (selectedCategoryIndex) {
@@ -131,6 +152,9 @@ void SettingsActivity::rebuildSettingsLists() {
     case 3:
       currentSettings = &systemSettings;
       break;
+    case 4:
+      currentSettings = &habitSheepSettings;
+      break;
   }
   settingsCount = static_cast<int>(currentSettings->size());
   rebuildRowItems();
@@ -141,7 +165,7 @@ void SettingsActivity::onEnter() {
 
   // Reset selection to first category (ring position 0, the tab bar, comes
   // from the base's per-tab nav reset)
-  selectedCategoryIndex = 0;
+  selectedCategoryIndex = initialCategoryIndex;
   preserveQuickResumeTimeoutOn =
       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
   quickResumeTimeoutAutoEnabled = false;
@@ -164,6 +188,9 @@ void SettingsActivity::selectCategory(const int categoryIndex) {
       break;
     case 3:
       currentSettings = &systemSettings;
+      break;
+    case 4:
+      currentSettings = &habitSheepSettings;
       break;
   }
   settingsCount = static_cast<int>(currentSettings->size());
@@ -220,6 +247,7 @@ void SettingsActivity::onExit() {
 }
 
 void SettingsActivity::applyUiSettingChange(uint8_t CrossPointSettings::* valuePtr) {
+  if (valuePtr == &CrossPointSettings::sleepScreen && !HABIT_SHEEP.isEnabled()) HABIT_SHEEP.clearPausedSleepScreen();
   // Theme changes take effect immediately, on this screen — reload the theme
   // and re-derive the app's tokens so the very next repaint is in the new look.
   if (valuePtr != &CrossPointSettings::uiTheme) {
@@ -279,6 +307,13 @@ void SettingsActivity::toggleCurrentSetting() {
   }
 
   const auto& setting = (*currentSettings)[selectedSetting];
+  optionPopup.setHabitStyle(selectedCategoryIndex == 4);
+  if (selectedCategoryIndex == 4 && habitResetPending() && setting.action != SettingAction::HabitReset) {
+    const char* options[] = {tr(STR_BACK)};
+    optionPopup.show(tr(STR_HABIT_RESET), tr(STR_HABIT_RESET_FAILURE), options, 1, 0, [this](int) { requestUpdate(); });
+    requestUpdate();
+    return;
+  }
   const bool sleepScreenChanged = setting.valuePtr == &CrossPointSettings::sleepScreen;
   const bool quickResumeTimeoutChanged = setting.valuePtr == &CrossPointSettings::quickResumeSleepScreen;
 
@@ -343,6 +378,102 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
+      case SettingAction::HabitReset: {
+        resetConfirmation.begin();
+        showHabitReset();
+        break;
+      }
+      case SettingAction::HabitMode: {
+        const char* options[] = {tr(STR_STATE_OFF), tr(STR_STATE_ON)};
+        optionPopup.show(tr(STR_HABIT_MODE), tr(STR_HABIT_PAUSE_HELP), options, 2, HABIT_SHEEP.isEnabled() ? 1 : 0,
+                         [this](int selected) {
+                           if (!setHabitSheepEnabled(selected == 1)) LOG_ERR("HABIT", "Cannot save habit mode");
+                           requestUpdate();
+                         });
+        requestUpdate();
+        break;
+      }
+      case SettingAction::HabitWeekStart: {
+        const StrId days[] = {StrId::STR_HABIT_SUNDAY,    StrId::STR_HABIT_MONDAY,   StrId::STR_HABIT_TUESDAY,
+                              StrId::STR_HABIT_WEDNESDAY, StrId::STR_HABIT_THURSDAY, StrId::STR_HABIT_FRIDAY,
+                              StrId::STR_HABIT_SATURDAY};
+        optionPopup.show(StrId::STR_HABIT_WEEK_START, days, 7, HABIT_SHEEP.getWeekStart(), [this](int selected) {
+          if (!HABIT_SHEEP.setWeekStart(selected)) LOG_ERR("HABIT", "Cannot save week start");
+          requestUpdate();
+        });
+        requestUpdate();
+        break;
+      }
+      case SettingAction::HabitHomeFocus: {
+        const StrId options[] = {StrId::STR_HABIT_HOME_FIRST, StrId::STR_HABIT_HOME_SHEEP,
+                                 StrId::STR_HABIT_CONTINUE_READING};
+        optionPopup.show(StrId::STR_HABIT_HOME_FOCUS, options, 3, HABIT_SHEEP.getHomeFocus(), [this](int selected) {
+          if (!HABIT_SHEEP.setHomeFocus(selected)) LOG_ERR("HABIT", "Cannot save Home focus");
+          requestUpdate();
+        });
+        requestUpdate();
+        break;
+      }
+      case SettingAction::HabitOrientation: {
+        const StrId options[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
+                                 StrId::STR_LANDSCAPE_CCW};
+        optionPopup.show(StrId::STR_HABIT_ORIENTATION, options, 4, HABIT_SHEEP.getOrientation(), [this](int selected) {
+          if (!HABIT_SHEEP.setOrientation(selected)) LOG_ERR("HABIT", "Cannot save orientation");
+          requestUpdate();
+        });
+        requestUpdate();
+        break;
+      }
+      case SettingAction::SheepMemory: {
+        auto activity = makeUniqueNoThrow<SheepMemoryActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("HABIT", "OOM: memory game");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
+      case SettingAction::SheepName: {
+        auto activity = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SHEEP_NAME),
+                                                                 HABIT_SHEEP.getSheepName(),
+                                                                 HabitSheepStore::MAX_NAME_BYTES, InputType::Text);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Sheep name editor");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult& result) {
+          if (!result.isCancelled) HABIT_SHEEP.setSheepName(std::get<KeyboardResult>(result.data).text);
+          requestUpdate();
+        });
+        break;
+      }
+      case SettingAction::ActiveHabits: {
+        auto activity = makeUniqueNoThrow<ActiveHabitsActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Active habits");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
+      case SettingAction::HabitLibrary: {
+        auto activity = makeUniqueNoThrow<HabitLibraryActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Habit library");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
+      case SettingAction::GrassHistory: {
+        auto activity = makeUniqueNoThrow<GrassHistoryActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SETTINGS", "OOM: Grass history");
+          return;
+        }
+        startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        break;
+      }
       case SettingAction::HomeButton: {
         // Activities must outlive this call and are owned by the activity stack.
         auto activity = makeUniqueNoThrow<HomeButtonSettingsActivity>(renderer, mappedInput);
@@ -497,6 +628,37 @@ void SettingsActivity::openSleepTimeoutPicker() {
 }
 
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
+  if (setting.action == SettingAction::HabitMode) return HABIT_SHEEP.isEnabled() ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  if (setting.action == SettingAction::HabitHomeFocus) {
+    static constexpr StrId options[] = {StrId::STR_HABIT_HOME_FIRST, StrId::STR_HABIT_HOME_SHEEP,
+                                        StrId::STR_HABIT_CONTINUE_READING};
+    return I18N.get(options[HABIT_SHEEP.getHomeFocus()]);
+  }
+  if (setting.action == SettingAction::HabitOrientation) {
+    static constexpr StrId options[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
+                                        StrId::STR_LANDSCAPE_CCW};
+    return I18N.get(options[HABIT_SHEEP.getOrientation()]);
+  }
+  if (setting.action == SettingAction::HabitWeekStart) {
+    static constexpr StrId days[] = {StrId::STR_HABIT_SUNDAY,    StrId::STR_HABIT_MONDAY,   StrId::STR_HABIT_TUESDAY,
+                                     StrId::STR_HABIT_WEDNESDAY, StrId::STR_HABIT_THURSDAY, StrId::STR_HABIT_FRIDAY,
+                                     StrId::STR_HABIT_SATURDAY};
+    return I18N.get(days[HABIT_SHEEP.getWeekStart()]);
+  }
+  if (setting.action == SettingAction::SheepName) return HABIT_SHEEP.getSheepName();
+  if (setting.action == SettingAction::ActiveHabits) {
+    const auto& active = HABIT_SHEEP.getActiveHabitIds();
+    return std::to_string(
+               std::count_if(active.begin(), active.end(), [](const std::string& id) { return !id.empty(); })) +
+           "/3";
+  }
+  if (setting.action == SettingAction::HabitLibrary) return std::to_string(HABIT_SHEEP.getHabits().size()) + "/9";
+  if (setting.action == SettingAction::GrassHistory) {
+    char value[32];
+    snprintf(value, sizeof(value), tr(STR_SHEEP_GRASS_STOCK), static_cast<unsigned>(SHEEP_STATE.getGrassStock()),
+             static_cast<unsigned>(SheepStateStore::GRASS_CAP));
+    return value;
+  }
   if (setting.action == SettingAction::HomeButton) return tr(STR_CONFIGURE);
   if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
     return SETTINGS.*(setting.valuePtr) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
@@ -597,4 +759,26 @@ void SettingsActivity::drawFooter() {
 void SettingsActivity::render(RenderLock&& lock) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
   UiListActivity::render(std::move(lock));
+}
+
+void SettingsActivity::showHabitReset() {
+  const bool second = resetConfirmation.second();
+  const char* options[] = {tr(STR_CANCEL), second ? tr(STR_HABIT_RESET_DELETE) : tr(STR_HABIT_RESET_CONTINUE)};
+  optionPopup.show(tr(STR_HABIT_RESET), second ? tr(STR_HABIT_RESET_CONFIRM) : tr(STR_HABIT_RESET_WARNING), options, 2,
+                   0, [this](int index) {
+                     if (resetConfirmation.choose(index == 1)) {
+                       const bool ok = resetHabits();
+                       if (habitResetPending()) HABIT_SHEEP.blockForResetRecovery();
+                       rebuildSettingsLists();
+                       const char* done[] = {tr(STR_BACK)};
+                       optionPopup.show(tr(STR_HABIT_RESET),
+                                        ok ? tr(STR_HABIT_RESET_DONE) : tr(STR_HABIT_RESET_FAILURE), done, 1, 0,
+                                        [this](int) { requestUpdate(); });
+                     } else if (resetConfirmation.second()) {
+                       showHabitReset();
+                     }
+                     requestUpdate();
+                   });
+  optionPopup.setHeadlineLines(8);
+  requestUpdate();
 }

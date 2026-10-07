@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="288" viewBox="0 0 384 288">
+<!-- Original straight-on sheep for Sheep Turn and Sheep-doku. -->
+<g stroke="black" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M112 199v52q0 15 14 15t14-15v-52M244 199v52q0 15 14 15t14-15v-52M155 209v49q0 17 17 17t17-17v-49M195 209v49q0 17 17 17t17-17v-49" fill="black"/>
+<path d="M101 202q-27 0-25-25q-24-12-12-35q-16-23 8-39q-5-25 23-28q8-24 33-15q15-24 39-10q25-20 48-3q26-12 41 11q27-5 32 21q29 5 23 31q23 17 7 39q11 26-15 36q0 26-28 26q-13 25-39 15q-23 18-46 3q-23 16-45-2q-26 10-43-25Z" fill="white"/>
+<path d="M144 81q-39-7-53 20q-8 24 18 20l47-24M240 81q39-7 53 20q8 24-18 20l-47-24" fill="black"/>
+<path d="M149 75q-16 31-10 73q7 54 53 59q46-5 53-59q6-42-10-73Z" fill="black"/>
+<path d="M149 80q-15-15-1-27q3-15 20-13q7-18 24-10q17-8 24 10q17-2 20 13q14 12-1 27q-10 10-21 3q-11 10-22 2q-11 8-22-2q-11 7-21-3Z" fill="white"/>
+</g>
+<ellipse cx="168" cy="124" rx="7" ry="11" fill="white"/><ellipse cx="216" cy="124" rx="7" ry="11" fill="white"/>
+<path d="M178 174q14 15 28 0" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+</svg>

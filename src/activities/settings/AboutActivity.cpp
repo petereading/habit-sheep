@@ -9,6 +9,7 @@
 
 #include <cstdio>
 
+#include "I18n.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 
@@ -82,7 +83,7 @@ const char* touchControllerName(const BoardConfig::TouchController c) {
 AboutActivity::AboutActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
     : UiListActivity("About", renderer, mappedInput) {}
 
-const char* AboutActivity::headerTitle() const { return "About"; }
+const char* AboutActivity::headerTitle() const { return tr(STR_CROSSPOINT_SHEEP); }
 
 void AboutActivity::onEnter() {
   UiListActivity::onEnter();
